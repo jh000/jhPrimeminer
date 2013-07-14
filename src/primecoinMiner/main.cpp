@@ -221,7 +221,6 @@ void primecoinBlock_generateBlockHash(primecoinBlock_t* primecoinBlock, uint8 ha
 
 
 //bool CheckPrimeProofOfWork(BIGNUM* hashBlockHeader, unsigned int nBits, BIGNUM* bnPrimeChainMultiplier, unsigned int* nChainType, unsigned int* nChainLength);
-void BitcoinMiner(primecoinBlock_t* primecoinBlock);
 
 //#define ALLOC_SPEED_UP_BUFFERS		(32*5)
 //#define ALLOC_SPEED_UP_BUFFER_SIZE	(4096) // 4kb	
@@ -601,7 +600,7 @@ int jhMiner_workerThread(int threadIndex)
 		primecoinBlock.workDataHash = workDataHash;
 		// start mining
 		//uint32 time1 = GetTickCount();
-		BitcoinMiner(&primecoinBlock);
+		BitcoinMiner(&primecoinBlock, threadIndex);
 		//printf("Mining stopped after %dms\n", GetTickCount()-time1);
 		primecoinBlock.bnPrimeChainMultiplier = 0;
 	}
@@ -720,7 +719,10 @@ int main(int argc, char **argv)
 {
 	// setup some default values
 	commandlineInput.port = 8332;
-	commandlineInput.numThreads = 1;
+	SYSTEM_INFO sysinfo;
+	GetSystemInfo( &sysinfo );
+	commandlineInput.numThreads = sysinfo.dwNumberOfProcessors;
+	commandlineInput.numThreads = max(commandlineInput.numThreads, 1);
 	// parse command lines
 	jhMiner_parseCommandline(argc, argv);
 	if( commandlineInput.host == NULL )
@@ -732,7 +734,7 @@ int main(int argc, char **argv)
 	
 	printf("\n");
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  jhPrimeMiner (v0.2 beta)                                     \xBA\n");
+	printf("\xBA  jhPrimeMiner (v0.21 beta)                                    \xBA\n");
 	printf("\xBA  author: JH (http://ypool.net)                                \xBA\n");
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
 	printf("\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC\n");
@@ -757,6 +759,20 @@ int main(int argc, char **argv)
 	}
 	void** ipListPtr = (void**)hostInfo->h_addr_list;
 	uint32 ip = 0xFFFFFFFF;
+//#ifdef _WIN64
+//	if( ipListPtr[0] )
+//	{
+//		ip = (uint32)*(uint8*)((uint8*)ipListPtr[0]+0);
+//		ip |= ((uint32)*(uint8*)((uint8*)ipListPtr[0]+1))<<8;
+//		ip |= ((uint32)*(uint8*)((uint8*)ipListPtr[0]+2))<<16;
+//		ip |= ((uint32)*(uint8*)((uint8*)ipListPtr[0]+3))<<24;
+//	}
+//#else
+//	if( ipListPtr[0] )
+//	{
+//		ip = *(uint32*)ipListPtr[0];
+//	}
+//#endif
 	if( ipListPtr[0] )
 	{
 		ip = *(uint32*)ipListPtr[0];

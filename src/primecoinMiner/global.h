@@ -71,3 +71,5 @@ void primecoinBlock_generateHeaderHash(primecoinBlock_t* primecoinBlock, uint8 h
 uint32 _swapEndianessU32(uint32 v);
 uint32 jhMiner_getCurrentWorkHash();
 uint32 jhMiner_getCurrentWorkBlockHeight();
+
+void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex);

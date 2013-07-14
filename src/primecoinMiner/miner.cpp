@@ -2,7 +2,7 @@
 
 bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* block, CBigNum& bnFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit);
 
-void BitcoinMiner(primecoinBlock_t* primecoinBlock)//CWallet *pwallet)
+void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 {
 	//printf("PrimecoinMiner started\n");
 	//SetThreadPriority(THREAD_PRIORITY_LOWEST);
@@ -13,7 +13,18 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock)//CWallet *pwallet)
 	unsigned int nExtraNonce = 0;
 
 	static const unsigned int nPrimorialHashFactor = 7;
-	unsigned int nPrimorialMultiplier = nPrimorialHashFactor;
+	unsigned int nPrimorialMultiplierStart = 7;
+
+	static int startFactorList[4] =
+	{
+		11,
+		43,
+		79,
+		112
+	};
+	nPrimorialMultiplierStart = startFactorList[(threadIndex&3)];
+
+	unsigned int nPrimorialMultiplier = nPrimorialMultiplierStart;
 	int64 nTimeExpected = 0;   // time expected to prime chain (micro-second)
 	int64 nTimeExpectedPrev = 0; // time expected to prime chain last time
 	bool fIncrementPrimorial = true; // increase or decrease primorial factor
@@ -26,8 +37,12 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock)//CWallet *pwallet)
 	
 	// note: originally a wanted to loop as long as (primecoinBlock->workDataHash != jhMiner_getCurrentWorkHash()) did not happen
 	//		 but I noticed it might be smarter to just check if the blockHeight has changed, since that is what is really important
-	nPrimorialMultiplier = nPrimorialHashFactor;
+	nPrimorialMultiplier = nPrimorialMultiplierStart;
 	uint32 loopCount = 0;
+
+	CBigNum bnHashFactor;
+	Primorial(nPrimorialHashFactor, bnHashFactor);
+
 	while( GetTickCount() < nTime && primecoinBlock->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight() )
 	{
 		// printf("nPrimorialMultiplier: %d\n", nPrimorialMultiplier);
@@ -54,12 +69,9 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock)//CWallet *pwallet)
 		//
 		// Search
 		//
-		int64 nStart = 0;//GetTime();
 		bool fNewBlock = true;
 		unsigned int nTriedMultiplier = 0;
 		// Primecoin: try to find hash divisible by primorial
-		CBigNum bnHashFactor;
-		Primorial(nPrimorialHashFactor, bnHashFactor);
 		while ((primecoinBlock->blockHeaderHash < hashBlockHeaderLimit || CBigNum(primecoinBlock->blockHeaderHash) % bnHashFactor != 0) && primecoinBlock->nonce < 0xffff0000)
 		{
 			primecoinBlock->nonce++;
@@ -100,14 +112,14 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock)//CWallet *pwallet)
 		unsigned int nPrimesHit = 0;
 		
 		CBigNum bnMultiplierMin = bnPrimeMin * bnHashFactor / CBigNum(primecoinBlock->blockHeaderHash) + 1;
-		while (bnPrimorial < bnMultiplierMin)
+		while (bnPrimorial < bnMultiplierMin )
 		{
 			if (!PrimeTableGetNextPrime(&nPrimorialMultiplier))
 				error("PrimecoinMiner() : primorial minimum overflow");
 			Primorial(nPrimorialMultiplier, bnPrimorial);
 		}
 		CBigNum bnFixedMultiplier = (bnPrimorial > bnHashFactor) ? (bnPrimorial / bnHashFactor) : 1;
-
+		//printf("fixedMultiplier: %d nPrimorialMultiplier: %d\n", BN_get_word(&bnFixedMultiplier), nPrimorialMultiplier);
 		// Primecoin: mine for prime chain
 		unsigned int nProbableChainLength;
 		if (MineProbablePrimeChain(&psieve, primecoinBlock, bnFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit))
@@ -120,10 +132,10 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock)//CWallet *pwallet)
 		nRoundPrimesHit += nPrimesHit;
 
 		// added this
-		if( nPrimorialMultiplier >= 1000 )
+		if( nPrimorialMultiplier >= 800 )
 		{
 			primecoinBlock->nonce++;
-			nPrimorialMultiplier = nPrimorialHashFactor;
+			nPrimorialMultiplier = nPrimorialMultiplierStart;
 		}
 		loopCount++;
 	}

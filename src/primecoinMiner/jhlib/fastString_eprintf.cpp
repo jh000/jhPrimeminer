@@ -462,7 +462,11 @@ int esprintf_X(char *out, unsigned int value, int padRight, int padZero, int wid
 /*
  * Param = pointer to parameters used for format insertion
  */
+#ifdef _WIN64
+void __cdecl _esprintf(char *out, char *format, uint64 *param, unsigned int *lengthOut)
+#else
 void __cdecl _esprintf(char *out, char *format, unsigned int *param, unsigned int *lengthOut)
+#endif
 {
 	if( lengthOut )
 		*lengthOut = 0;
@@ -538,6 +542,52 @@ void __cdecl _esprintf(char *out, char *format, unsigned int *param, unsigned in
 					p++;
 				}
 				//Now check case
+#ifdef _WIN64
+				if( *p == 'd' ) //signed integer
+				{
+					o += esprintf_d(o, *(sint64*)param, PadRight, PadZero, Width); param++;
+				}
+				else if( p[0] == 'u' && p[1] == 't' && p[2] == 'f' && p[3] == '8' ) //utf8 string
+				{
+					o += esprintf_utf8(o, (char*)*(unsigned int*)param, PadRight, PadZero, Width); param++;
+					p += 3;
+				}
+				else if( p[0] == 'x' && p[1] == 'u' && p[2] == 't' && p[3] == 'f' && p[4] == '8' ) //hex-encoded utf8 string
+				{
+					o += esprintf_xutf8(o, (char*)*(unsigned int*)param, PadRight, PadZero, Width); param++;
+					p += 4;
+				}
+				else if( *p == 'u' ) //signed integer
+				{
+					o += esprintf_u(o, *(unsigned int*)param, PadRight, PadZero, Width); param++;
+				}
+				else if( *p == 'c' ) //signed ascii char
+				{
+					o += esprintf_c(o, *(char*)param, PadRight, PadZero, Width); param++;
+				}
+				else if( *p == 'b' ) //signed long integer
+				{
+					o += esprintf_b(o, *(signed long long*)param, PadRight, PadZero, Width); param += 2;
+				}
+				else if( *p == 's' ) //signed integer
+				{
+					o += esprintf_s(o, (char*)*(char**)param, PadRight, PadZero, Width); param++;
+				}
+				else if( *p == 'X' ) //unsigned integer as hex
+				{
+					o += esprintf_X(o, *(unsigned int*)param, PadRight, PadZero, Width, 1); param++;
+				}
+				else if( *p == 'x' ) //unsigned integer as hex
+				{
+					o += esprintf_X(o, *(unsigned int*)param, PadRight, PadZero, Width, 0); param++;
+				}
+				else if( p[0] == 'h' && p[1] == 'f' ) // helper float
+				{
+					o += esprintf_hf(o, (float)*(double*)param, PadRight, PadZero, Width); param++;
+					p += 1;
+				}
+				p++;
+#else
 				if( *p == 'd' ) //signed integer
 				{
 					o += esprintf_d(o, *(signed int*)param, PadRight, PadZero, Width); param++;
@@ -582,6 +632,7 @@ void __cdecl _esprintf(char *out, char *format, unsigned int *param, unsigned in
 					p += 1;
 				}
 				p++;
+#endif
 			}
 
 		}
@@ -600,7 +651,19 @@ void __cdecl _esprintf(char *out, char *format, unsigned int *param, unsigned in
 void esprintf(char *out, char *format, ...)
 {
 	// use some dirty trick to access varying arguments
-	unsigned int *param = (unsigned int*)_ADDRESSOF(format);
-	param++; // skip first parameter
-	_esprintf(out, format, param, NULL);
+	//unsigned int *param = (unsigned int*)_ADDRESSOF(format);
+	//param++; // skip first parameter
+	//_esprintf(out, format, param, NULL);
+	#ifdef _WIN64
+		uint64 *param = (uint64*)_ADDRESSOF(format);
+		param++; // skip first parameter
+		unsigned int formattedLength = 0;
+		_esprintf(out, format, param, &formattedLength);
+	#else
+		unsigned int *param = (unsigned int*)_ADDRESSOF(format);
+		param++; // skip first parameter
+		unsigned int formattedLength = 0;
+		_esprintf(out, format, param, &formattedLength);
+	#endif
+
 }

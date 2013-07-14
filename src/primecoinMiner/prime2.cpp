@@ -450,7 +450,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 		(*psieve)->WeaveFastAll();
 		
 		//while ((*psieve)->WeaveOriginal() && GetTickCount() < sieveStopTimeLimit );
-		//printf("MineProbablePrimeChain() : new sieve (%u/%u) ready in %ums\n", (*psieve)->GetCandidateCount(), nMaxSieveSize, (unsigned int) (GetTickCount() - nStart));
+		//printf("MineProbablePrimeChain() : new sieve (%u/%u) ready in %ums multiplier: %u\n", (*psieve)->GetCandidateCount(), nMaxSieveSize, (unsigned int) (GetTickCount() - nStart), bnFixedMultiplier);
 	}
 
 	CBigNum bnChainOrigin;
@@ -460,8 +460,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 
 	//uint32 timeStop = GetTickCount() + 25000;
 	uint32 nTries = 0;
-
-	while ( nTries < 200 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight() )
+	while ( nTries < 5000 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight() )
 	{
 		nTries++;
 		nTests++;
@@ -966,41 +965,37 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 		if (!BN_mod_inverse(&bn_twoInverse, &bn_constTwo, &bn_p, pctx))
 			return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
 
+		
+		uint64 pU64 = (uint64)vPrimes[nPrimeSeq];
+		uint64 fixedInverseU64 = BN_get_word(&bn_fixedInverse);
+		uint64 twoInverseU64 = BN_get_word(&bn_twoInverse);
 		// Weave the sieve for the prime
 		unsigned int nChainLength = TargetGetLength(nBits);
 		for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
 		{
 			// Find the first number that's divisible by this prime
-			//int nDelta = (((nBiTwinSeq&1) == 0)? (-1) : 1);
-			//unsigned int nSolvedMultiplier = ((bnFixedInverse * (p - nDelta)) % p).getuint();
-			//if (nBiTwinSeq % 2 == 1)
-			//	bnFixedInverse *= bnTwoInverse; // for next number in chain
+			//BN_copy(&bn_tmp, &bn_p);
+			//if( (nBiTwinSeq&1) == 0 )
+			//	BN_add_word(&bn_tmp, 1);
+			//else
+			//	BN_sub_word(&bn_tmp, 1);		
+			//BN_mul(&bn_tmp, &bn_fixedInverse, &bn_tmp, pctx);
+			//BN_mod(&bn_tmp, &bn_tmp, &bn_p, pctx);
+			//unsigned int nSolvedMultiplier = BN_get_word(&bn_tmp);
 
-			/*if( nDelta > 0 )
-				BN_set_word(&bn_delta, nDelta);
-			else
-			{
-				BN_set_word(&bn_delta, -nDelta);
-				bn_delta.neg = 1;
-			}*/
-
-			//unsigned int nSolvedMultiplier = ((bnFixedInverse * (p - nDelta)) % p).getuint();
-			//if (nBiTwinSeq % 2 == 1)
-			//	bnFixedInverse *= bnTwoInverse; // for next number in chain
-
-			// maybe just use this method below: BN_sub_word() (since delta is actually a word)
-			//BN_sub(&bn_tmp, &bn_p, &bn_delta);
-			BN_copy(&bn_tmp, &bn_p);
+			uint64 nSolvedMultiplier;
 			if( (nBiTwinSeq&1) == 0 )
-				BN_add_word(&bn_tmp, 1);
+				nSolvedMultiplier = ((fixedInverseU64) * (pU64 + 1ULL)) % pU64;
 			else
-				BN_sub_word(&bn_tmp, 1);		
-			BN_mul(&bn_tmp, &bn_fixedInverse, &bn_tmp, pctx);
-			BN_mod(&bn_tmp, &bn_tmp, &bn_p, pctx);
-			unsigned int nSolvedMultiplier = BN_get_word(&bn_tmp);
+				nSolvedMultiplier = ((fixedInverseU64) * (pU64 - 1ULL)) % pU64;
+
+			//if( nSolvedMultiplier != nSolvedMultiplier2 )
+			//	__debugbreak();
 
 			if (nBiTwinSeq % 2 == 1)
-				BN_mul(&bn_fixedInverse, &bn_fixedInverse, &bn_twoInverse, pctx);
+			{
+				fixedInverseU64 = (fixedInverseU64*twoInverseU64)%pU64;
+			}
 			unsigned int nPrime = vPrimes[nPrimeSeq];
 			if (nBiTwinSeq < nChainLength)
 				for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)

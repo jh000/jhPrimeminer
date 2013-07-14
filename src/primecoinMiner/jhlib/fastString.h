@@ -55,7 +55,12 @@ void fStrCpy(char *dst, char *src, unsigned int limit);
 int fStrLen(char *src);
 
 // other
-void _esprintf(char *out, char *format, unsigned int *param, unsigned int *lengthOut); // used only internally
+#ifdef _WIN64
+void __cdecl _esprintf(char *out, char *format, uint64 *param, unsigned int *lengthOut);
+#else
+void __cdecl _esprintf(char *out, char *format, unsigned int *param, unsigned int *lengthOut);
+#endif
+//void _esprintf(char *out, char *format, unsigned int *param, unsigned int *lengthOut); // used only internally
 void esprintf(char *out, char *format, ...);
 
 // tokenizer

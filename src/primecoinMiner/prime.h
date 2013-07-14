@@ -10,7 +10,7 @@
 //static const unsigned int nMaxSieveSize = 1000000u;
 //static const unsigned int nMaxSieveSize = 2000000u;
 //static const unsigned int nMaxSieveSize = 500000u;
-static const unsigned int nMaxSieveSize = 800000u;
+static const unsigned int nMaxSieveSize = 1000000u;//800000u;
 static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
 static const CBigNum bnOne = 1;
 static const CBigNum bnPrimeMax = (bnOne << 2000) - 1;

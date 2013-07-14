@@ -1,4 +1,5 @@
 #include"./JHLib.h"
+#include<stdio.h>
 
 // local variables
 extern fStr_format_t fStr_formatInfo_ASCII;
@@ -163,10 +164,16 @@ void fStr_append(fStr_t* fStr, fStr_t* source)
 int fStr_appendFormatted(fStr_t* fStr, char *format, ...)
 {
 	// use some dirty trick to access varying arguments
+#ifdef _WIN64
+	uint64 *param = (uint64*)_ADDRESSOF(format);
+	param++; // skip first parameter
+	unsigned int formattedLength = 0;	_esprintf((char*)(fStr->str + fStr->length), format, param, &formattedLength);
+#else
 	unsigned int *param = (unsigned int*)_ADDRESSOF(format);
 	param++; // skip first parameter
 	unsigned int formattedLength = 0;
 	_esprintf((char*)(fStr->str + fStr->length), format, param, &formattedLength);
+#endif
 	fStr->length += formattedLength;
 	return formattedLength;
 }
@@ -429,7 +436,7 @@ void fStr_addHexString(fStr_t* fStr, uint8* data, uint32 dataLength)
 	uint8* ptr = (fStr->str+fStr->length);
 	for(uint32 i=0; i<dataLength; i++)
 	{
-		esprintf((char*)ptr, "%02x", data[i]);
+		sprintf((char*)ptr, "%02x", data[i]);
 		ptr += 2;
 	}
 	fStr->length += dataLength*2;
