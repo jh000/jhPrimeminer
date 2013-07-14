@@ -458,10 +458,12 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 	//nStart = GetTickCount();
 	//nCurrent = nStart;
 
-	uint32 timeStop = GetTickCount() + 25000;
+	//uint32 timeStop = GetTickCount() + 25000;
+	uint32 nTries = 0;
 
-	while ( GetTickCount() < timeStop && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight() )
+	while ( nTries < 200 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight() )
 	{
+		nTries++;
 		nTests++;
 		if (!(*psieve)->GetNextCandidateMultiplier(nTriedMultiplier))
 		{
@@ -676,13 +678,13 @@ bool CSieveOfEratosthenes::WeaveOriginal()
 		unsigned int nPrime = vPrimes[nPrimeSeq];
 		if (nBiTwinSeq < nChainLength)
 			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-				vfCompositeBiTwin[nVariableMultiplier>>3] = 1<<(nVariableMultiplier&7);
+				vfCompositeBiTwin[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
 		if (((nBiTwinSeq & 1u) == 0))
 			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-				vfCompositeCunningham1[nVariableMultiplier>>3] = 1<<(nVariableMultiplier&7);
+				vfCompositeCunningham1[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
 		if (((nBiTwinSeq & 1u) == 1u))
 			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-				vfCompositeCunningham2[nVariableMultiplier>>3] = 1<<(nVariableMultiplier&7);
+				vfCompositeCunningham2[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
 	}
 	nPrimeSeq++;
 	//delete[] p;
@@ -1002,13 +1004,13 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 			unsigned int nPrime = vPrimes[nPrimeSeq];
 			if (nBiTwinSeq < nChainLength)
 				for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-					vfCompositeBiTwin[nVariableMultiplier>>3] = 1<<(nVariableMultiplier&7);
+					vfCompositeBiTwin[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
 			if (((nBiTwinSeq & 1u) == 0))
 				for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-					vfCompositeCunningham1[nVariableMultiplier>>3] = 1<<(nVariableMultiplier&7);
+					vfCompositeCunningham1[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
 			if (((nBiTwinSeq & 1u) == 1u))
 				for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-					vfCompositeCunningham2[nVariableMultiplier>>3] = 1<<(nVariableMultiplier&7);
+					vfCompositeCunningham2[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
 		}
 		nPrimeSeq++;
 	}

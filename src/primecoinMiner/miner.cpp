@@ -22,12 +22,15 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock)//CWallet *pwallet)
 
 	primecoinBlock->nonce = 0;
 
-	uint32 nTime = GetTickCount() + 1000*15;
+	uint32 nTime = GetTickCount() + 1000*60;
 	
 	// note: originally a wanted to loop as long as (primecoinBlock->workDataHash != jhMiner_getCurrentWorkHash()) did not happen
 	//		 but I noticed it might be smarter to just check if the blockHeight has changed, since that is what is really important
+	nPrimorialMultiplier = nPrimorialHashFactor;
+	uint32 loopCount = 0;
 	while( GetTickCount() < nTime && primecoinBlock->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight() )
 	{
+		// printf("nPrimorialMultiplier: %d\n", nPrimorialMultiplier);
 		//while (vNodes.empty())
 		//	MilliSleep(1000);
 
@@ -46,7 +49,6 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock)//CWallet *pwallet)
 		//printf("Running PrimecoinMiner with %"PRIszu" transactions in block (%u bytes)\n", pblock->vtx.size(),
 		//	::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
 
-		nPrimorialMultiplier = nPrimorialHashFactor;
 
 		primecoinBlock_generateHeaderHash(primecoinBlock, primecoinBlock->blockHeaderHash.begin());
 		//
@@ -71,20 +73,27 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock)//CWallet *pwallet)
 		unsigned int nRoundTests = 0;
 		unsigned int nRoundPrimesHit = 0;
 		//int64 nPrimeTimerStart = GetTimeMicros();
-		if (nTimeExpected > nTimeExpectedPrev)
-			fIncrementPrimorial = !fIncrementPrimorial;
-		nTimeExpectedPrev = nTimeExpected;
-		// Primecoin: dynamic adjustment of primorial multiplier
-		if (fIncrementPrimorial)
+		//if (nTimeExpected > nTimeExpectedPrev)
+		//	fIncrementPrimorial = !fIncrementPrimorial;
+		//nTimeExpectedPrev = nTimeExpected;
+		//// Primecoin: dynamic adjustment of primorial multiplier
+		//if (fIncrementPrimorial)
+		//{
+		//	if (!PrimeTableGetNextPrime(&nPrimorialMultiplier))
+		//		error("PrimecoinMiner() : primorial increment overflow");
+		//}
+		//else if (nPrimorialMultiplier > nPrimorialHashFactor)
+		//{
+		//	if (!PrimeTableGetPreviousPrime(&nPrimorialMultiplier))
+		//		error("PrimecoinMiner() : primorial decrement overflow");
+		//}
+
+		if( loopCount > 0 )
 		{
 			if (!PrimeTableGetNextPrime(&nPrimorialMultiplier))
 				error("PrimecoinMiner() : primorial increment overflow");
 		}
-		else if (nPrimorialMultiplier > nPrimorialHashFactor)
-		{
-			if (!PrimeTableGetPreviousPrime(&nPrimorialMultiplier))
-				error("PrimecoinMiner() : primorial decrement overflow");
-		}
+
 		Primorial(nPrimorialMultiplier, bnPrimorial);
 
 		unsigned int nTests = 0;
@@ -111,7 +120,12 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock)//CWallet *pwallet)
 		nRoundPrimesHit += nPrimesHit;
 
 		// added this
-		primecoinBlock->nonce++;
+		if( nPrimorialMultiplier >= 1000 )
+		{
+			primecoinBlock->nonce++;
+			nPrimorialMultiplier = nPrimorialHashFactor;
+		}
+		loopCount++;
 	}
 	
 }

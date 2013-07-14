@@ -7,7 +7,7 @@ primeStats_t primeStats = {0};
 bool error(const char *format, ...)
 {
 	puts(format);
-	__debugbreak();
+	//__debugbreak();
 	return false;
 }
 
@@ -732,7 +732,7 @@ int main(int argc, char **argv)
 	
 	printf("\n");
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  jhPrimeMiner (v0.1 beta)                                     \xBA\n");
+	printf("\xBA  jhPrimeMiner (v0.2 beta)                                     \xBA\n");
 	printf("\xBA  author: JH (http://ypool.net)                                \xBA\n");
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
 	printf("\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC\n");
@@ -785,31 +785,35 @@ int main(int argc, char **argv)
 	for(sint32 threadIdx=0; threadIdx<nThreads; threadIdx++)
 		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)jhMiner_workerThread, (LPVOID)threadIdx, 0, 0);
 	// main thread, query work every 8 seconds
+	sint32 loopCounter = 0;
 	while( true )
 	{
 		// query new work
 		jhMiner_queryWork_primecoin();
-		// calculate stats
-		double statsPassedTime = (double)GetTickCount() - primeStats.primeLastUpdate;
-		if( statsPassedTime < 1.0 )
-			statsPassedTime = 1.0; // avoid division by zero
-		double primesPerSecond = (double)primeStats.primeChainsFound / (statsPassedTime / 1000.0);
-		//double qualityPrimesPerSecond = (double)primeStats.qualityPrimesFound / (statsPassedTime / 1000.0);
-		primeStats.primeLastUpdate = GetTickCount();
-		primeStats.primeChainsFound = 0;
-		uint32 bestDifficulty = primeStats.bestPrimeChainDifficulty;
-		primeStats.bestPrimeChainDifficulty = 0;
-		double primeDifficulty = (double)bestDifficulty / (double)0x1000000;
-		if( workData.dataIsValid )
-			printf("primes/s: %d best difficulty: %f\n", (sint32)primesPerSecond, (float)primeDifficulty);
+		// calculate stats every second tick
+		if( loopCounter&1 )
+		{
+			double statsPassedTime = (double)GetTickCount() - primeStats.primeLastUpdate;
+			if( statsPassedTime < 1.0 )
+				statsPassedTime = 1.0; // avoid division by zero
+			double primesPerSecond = (double)primeStats.primeChainsFound / (statsPassedTime / 1000.0);
+			primeStats.primeLastUpdate = GetTickCount();
+			primeStats.primeChainsFound = 0;
+			uint32 bestDifficulty = primeStats.bestPrimeChainDifficulty;
+			primeStats.bestPrimeChainDifficulty = 0;
+			double primeDifficulty = (double)bestDifficulty / (double)0x1000000;
+			if( workData.dataIsValid )
+				printf("primes/s: %d best difficulty: %f\n", (sint32)primesPerSecond, (float)primeDifficulty);
+		}		
 		// wait and check some stats
-		uint32 time_updateWork = GetTickCount() + 8000;
+		uint32 time_updateWork = GetTickCount() + 4000;
 		while( true )
 		{
 			if( GetTickCount() >= time_updateWork )
 				break;
 			Sleep(500);
 		}
+		loopCounter++;
 	}
 }
 
