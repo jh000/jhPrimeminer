@@ -3,6 +3,8 @@
 #include<intrin.h>
 
 primeStats_t primeStats = {0};
+total_shares = 0;
+valid_shares = 0;
 
 bool error(const char *format, ...)
 {
@@ -483,12 +485,16 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 		jsonObject_t* jsonReturnValueBool = jsonObject_getParameter(jsonReturnValue, "result");
 		if( jsonObject_isTrue(jsonReturnValueBool) )
 		{
-			printf("Valid share found!\n");
+			total_share++;
+			valid_share++;
+			printf("Valid share found!");
+			printf("[ %d / %d ]", valid_share, total_share);
 			jsonObject_freeObject(jsonReturnValue);
 			return true;
 		}
 		else
 		{
+			total_share++;
 			// the server says no to this share :(
 			printf("Server rejected share (BlockHeight: %d/%d nBits: 0x%08X)\n", primecoinBlock->serverData.blockHeight, jhMiner_getCurrentWorkBlockHeight(), primecoinBlock->serverData.client_shareBits);
 			jsonObject_freeObject(jsonReturnValue);
