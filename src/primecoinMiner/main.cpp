@@ -5,6 +5,7 @@
 primeStats_t primeStats = {0};
 total_shares = 0;
 valid_shares = 0;
+unsigned int nMaxSieveSize;
 
 bool error(const char *format, ...)
 {
@@ -620,6 +621,7 @@ typedef struct
 	char* host;
 	sint32 port;
 	sint32 numThreads;
+	sint32 sieveSize;
 }commandlineInput_t;
 
 commandlineInput_t commandlineInput = {0};
@@ -634,6 +636,8 @@ void jhMiner_printHelp()
 	puts("   -p                            The password used for login");
 	puts("   -t                            The number of threads for mining (default 1)");
 	puts("                                 For most efficient mining, set to number of cores");
+	puts("   -s                            Set MaxSieveSize range from 200000 - 10000000");
+	puts("                                 Default is 1000000.");
 	puts("Example usage:");
 	puts("   jhPrimeminer.exe -o http://poolurl.com:8332 -u workername.1 -p workerpass -t 4");
 }
@@ -645,6 +649,8 @@ void jhMiner_parseCommandline(int argc, char **argv)
 	{
 		char* argument = argv[cIdx];
 		cIdx++;
+		//sets default maxSieveSize
+		commandlineInput.sieveSize = 1000000;
 		if( memcmp(argument, "-o", 2)==0 || memcmp(argument, "-O", 2)==0 )
 		{
 			// -o
@@ -703,6 +709,22 @@ void jhMiner_parseCommandline(int argc, char **argv)
 			}
 			cIdx++;
 		}
+		else if( memcmp(argument, "-s", 2)==0 )
+		{
+			// -s
+			if( cIdx >= argc )
+			{
+				printf("Missing number after -s option\n");
+				ExitProcess(0);
+			}
+			commandlineInput.sieveSize = atoi(argv[cIdx]);
+			if( commandlineInput.sieveSize < 200000 || commandlineInput.sieveSize > 10000000 )
+			{
+				printf("-s parameter out of range, must be between 200000 - 10000000");
+				ExitProcess(0);
+			}
+			cIdx++;
+		}
 		else if( memcmp(argument, "-help", 5)==0 || memcmp(argument, "--help", 6)==0 )
 		{
 			jhMiner_printHelp();
@@ -731,6 +753,8 @@ int main(int argc, char **argv)
 	commandlineInput.numThreads = max(commandlineInput.numThreads, 1);
 	// parse command lines
 	jhMiner_parseCommandline(argc, argv);
+	// Sets max sieve size
+	nMaxSieveSize = commandlineInput.sieveSize;
 	if( commandlineInput.host == NULL )
 	{
 		printf("Missing -o option\n");
