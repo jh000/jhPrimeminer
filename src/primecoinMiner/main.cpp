@@ -838,6 +838,11 @@ int main(int argc, char **argv)
 	// start threads
 	for(sint32 threadIdx=0; threadIdx<nThreads; threadIdx++)
 		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)jhMiner_workerThread, (LPVOID)threadIdx, 0, 0);
+	
+	// for average primes/s since startup
+	double primesPerSecondSum = 0.0;
+	double primesPerSecondCount = 0.0;
+
 	// main thread, query work every 8 seconds
 	sint32 loopCounter = 0;
 	while( true )
@@ -858,8 +863,10 @@ int main(int argc, char **argv)
 			double primeDifficulty = (double)bestDifficulty / (double)0x1000000;
 			if( workData.dataIsValid )
 			{
+				primesPerSecondSum += primesPerSecond;
+				primesPerSecondCount += 1.0;
 				primeStats.bestPrimeChainDifficultySinceLaunch = max(primeStats.bestPrimeChainDifficultySinceLaunch, primeDifficulty);
-				printf("primes/s: %d best difficulty: %f record: %f\n", (sint32)primesPerSecond, (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
+				printf("primes/s: %d, average: %d, best difficulty: %f, record: %f\n", (sint32)primesPerSecond, (sint32)(primesPerSecondSum / primesPerSecondCount), (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
 			}
 		}		
 		// wait and check some stats
