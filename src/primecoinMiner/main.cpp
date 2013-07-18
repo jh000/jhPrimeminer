@@ -486,10 +486,10 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 		jsonObject_t* jsonReturnValueBool = jsonObject_getParameter(jsonReturnValue, "result");
 		if( jsonObject_isTrue(jsonReturnValueBool) )
 		{
-			total_share++;
-			valid_share++;
+			total_shares++;
+			valid_shares++;
 			printf("Valid share found!");
-			printf("[ %d / %d ]", valid_share, total_share);
+			printf("[ %d / %d ]", valid_shares, total_shares);
 			jsonObject_freeObject(jsonReturnValue);
 			return true;
 		}
