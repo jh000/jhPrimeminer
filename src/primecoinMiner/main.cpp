@@ -4,8 +4,8 @@
 #include<ctime>
 
 primeStats_t primeStats = {0};
-total_shares = 0;
-valid_shares = 0;
+int total_shares = 0;
+int valid_shares = 0;
 unsigned int nMaxSieveSize;
 char* dt;
 
