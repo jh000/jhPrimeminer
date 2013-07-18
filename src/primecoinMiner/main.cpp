@@ -1,11 +1,13 @@
 #include"global.h"
 
 #include<intrin.h>
+#include<ctime>
 
 primeStats_t primeStats = {0};
 total_shares = 0;
 valid_shares = 0;
 unsigned int nMaxSieveSize;
+char* dt;
 
 bool error(const char *format, ...)
 {
@@ -488,14 +490,16 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 		{
 			total_shares++;
 			valid_shares++;
+			time_t now = time(0);
+			dt = ctime(&now);
 			printf("Valid share found!");
-			printf("[ %d / %d ]", valid_shares, total_shares);
+			printf("[ %d / %d ] %s",valid_shares, total_shares,dt);
 			jsonObject_freeObject(jsonReturnValue);
 			return true;
 		}
 		else
 		{
-			total_share++;
+			total_shares++;
 			// the server says no to this share :(
 			printf("Server rejected share (BlockHeight: %d/%d nBits: 0x%08X)\n", primecoinBlock->serverData.blockHeight, jhMiner_getCurrentWorkBlockHeight(), primecoinBlock->serverData.client_shareBits);
 			jsonObject_freeObject(jsonReturnValue);
