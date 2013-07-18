@@ -17,10 +17,26 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 
 	static int startFactorList[4] =
 	{
-		11,
-		43,
-		79,
-		112
+		//11,
+		//43,
+		//79,
+		//112
+		//7,7,7,7
+		//3209,3221,4789,5179
+		//7,7,7,7
+		//103,103,103,103	~1800
+		//43     ,43     ,43     ,43     
+		//67,67,67,67
+		
+		//107,107,107,107 ~1900 (2500 x32)
+		
+		//127,127,127,127 //~3000 (x32)
+
+		149,149,149,149 //~3150 (x32) 
+		//it seems to be not better than v0.21?
+		//173,173,173,173 // ~3150 (x32)
+		//191,191,191,191 // ~3050 (x32)
+		//151,151,151,151 // ~3150 (x32)
 	};
 	nPrimorialMultiplierStart = startFactorList[(threadIndex&3)];
 
@@ -79,7 +95,10 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		}
 		//printf("Use nonce %d\n", primecoinBlock->nonce);
 		if (primecoinBlock->nonce >= 0xffff0000)
+		{
+			printf("Nonce overflow\n");
 			break;
+		}
 		// Primecoin: primorial fixed multiplier
 		CBigNum bnPrimorial;
 		unsigned int nRoundTests = 0;
@@ -100,11 +119,12 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		//		error("PrimecoinMiner() : primorial decrement overflow");
 		//}
 
-		if( loopCount > 0 )
-		{
-			if (!PrimeTableGetNextPrime(&nPrimorialMultiplier))
-				error("PrimecoinMiner() : primorial increment overflow");
-		}
+		//if( loopCount > 0 )
+		//{
+		//	primecoinBlock->nonce++;
+		///*	if (!PrimeTableGetNextPrime(&nPrimorialMultiplier))
+		//		error("PrimecoinMiner() : primorial increment overflow");*/
+		//}
 
 		Primorial(nPrimorialMultiplier, bnPrimorial);
 
@@ -137,6 +157,7 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 			primecoinBlock->nonce++;
 			nPrimorialMultiplier = nPrimorialMultiplierStart;
 		}
+		primecoinBlock->nonce++;
 		loopCount++;
 	}
 	

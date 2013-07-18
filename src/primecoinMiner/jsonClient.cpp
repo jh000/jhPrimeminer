@@ -123,6 +123,8 @@ jsonObject_t* jsonClient_request(jsonRequestTarget_t* server, char* methodName, 
 		*errorCode = JSON_ERROR_HOST_NOT_FOUND;
 		return NULL;
 	}
+
+	uint32 startTime = GetTickCount(); // todo: Replace with crossplatform method
 	// build json request data
 	// example: {"method": "getwork", "params": [], "id":0}
 	fStr_t* fStr_jsonRequestData = fStr_alloc(1024*512); // 64KB (this is also used as the recv buffer!)
@@ -175,6 +177,29 @@ jsonObject_t* jsonClient_request(jsonRequestTarget_t* server, char* methodName, 
 			closesocket(serverSocket);
 			fStr_free(fStr_jsonRequestData);
 			return NULL;
+		}
+		// wait for data to receive
+		fd_set fds;
+		int n;
+		struct timeval tv;
+		FD_ZERO(&fds) ;
+		FD_SET(serverSocket, &fds) ;
+		tv.tv_sec = 60; // timeout 60 seconds after the last recv
+		tv.tv_usec = 0;
+		// wait until timeout or data received.
+		n = select(serverSocket, &fds, NULL, NULL, &tv ) ;
+		if( n == 0)
+		{
+			uint32 passedTime = GetTickCount() - startTime;
+			if( passedTime >= 60*1000 )
+				break; // timeout!
+			printf("JSON request timed out after %dms\n", passedTime);
+			break;
+		}
+		else if( n == -1 )
+		{
+			printf("JSON receive error\n");
+			break;
 		}
 		sint32 r = recv(serverSocket, (char*)(recvBuffer+recvIndex), remainingRecvSize, 0);
 		if( r <= 0 )
@@ -320,6 +345,7 @@ jsonObject_t* jsonClient_request(jsonRequestTarget_t* server, char* methodName, 
 	if( serverSocket != 0 )
 	{
 		closesocket(serverSocket);
+		serverSocket = 0;
 	}
 	// free everything again
 	fStr_free(fStr_jsonRequestData);

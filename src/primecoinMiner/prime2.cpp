@@ -460,7 +460,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 
 	//uint32 timeStop = GetTickCount() + 25000;
 	uint32 nTries = 0;
-	while ( nTries < 5000 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight() )
+	while ( nTries < 15000 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight() )
 	{
 		nTries++;
 		nTests++;
@@ -519,7 +519,8 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 			RtlZeroMemory(blockRawData, 256);
 			delete *psieve;
 			*psieve = NULL;
-			return true;
+			// dont quit if we find a share, there could be other shares in the remaining prime candidates
+			return false;
 		}
 		//if(TargetGetLength(nProbableChainLength) >= 1)
 		//	nPrimesHit++;

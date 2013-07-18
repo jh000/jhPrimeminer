@@ -41,6 +41,7 @@ typedef struct
 	// its better if we only count primes with at least a given difficulty
 	//volatile uint32 qualityPrimesFound;
 	volatile uint32 bestPrimeChainDifficulty;
+	volatile double bestPrimeChainDifficultySinceLaunch;
 	uint32 primeLastUpdate;
 }primeStats_t;
 
