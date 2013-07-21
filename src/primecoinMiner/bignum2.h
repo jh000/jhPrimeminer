@@ -411,7 +411,7 @@ public:
 			return "0";
 		while (BN_cmp(&bn, &bn0) > 0)
 		{
-			if (!BN_div(&dv, &rem, &bn, &bnBase, pctx))
+			if (!BN2_div(&dv, &rem, &bn, &bnBase, pctx))
 				throw bignum_error("CBigNum::ToString() : BN_div failed");
 			bn = dv;
 			unsigned int c = rem.getulong();
@@ -589,7 +589,7 @@ inline const CBigNum operator/(const CBigNum& a, const CBigNum& b)
 {
 	CAutoBN_CTX pctx;
 	CBigNum r;
-	if (!BN_div(&r, NULL, &a, &b, pctx))
+	if (!BN2_div(&r, NULL, &a, &b, pctx))
 		throw bignum_error("CBigNum::operator/ : BN_div failed");
 	return r;
 }
@@ -598,7 +598,8 @@ inline const CBigNum operator%(const CBigNum& a, const CBigNum& b)
 {
 	CAutoBN_CTX pctx;
 	CBigNum r;
-	if (!BN_mod(&r, &a, &b, pctx))
+	//if (!BN_mod(&r, &a, &b, pctx))
+	if (!BN2_div(NULL, (&r), (&a), (&b), (pctx)))
 		throw bignum_error("CBigNum::operator% : BN_div failed");
 	return r;
 }

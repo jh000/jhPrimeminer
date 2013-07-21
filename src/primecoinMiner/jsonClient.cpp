@@ -184,15 +184,13 @@ jsonObject_t* jsonClient_request(jsonRequestTarget_t* server, char* methodName, 
 		struct timeval tv;
 		FD_ZERO(&fds) ;
 		FD_SET(serverSocket, &fds) ;
-		tv.tv_sec = 60; // timeout 60 seconds after the last recv
+		tv.tv_sec = 30; // timeout 60 seconds after the last recv
 		tv.tv_usec = 0;
 		// wait until timeout or data received.
 		n = select(serverSocket, &fds, NULL, NULL, &tv ) ;
 		if( n == 0)
 		{
 			uint32 passedTime = GetTickCount() - startTime;
-			if( passedTime >= 60*1000 )
-				break; // timeout!
 			printf("JSON request timed out after %dms\n", passedTime);
 			break;
 		}

@@ -14,6 +14,8 @@
 extern unsigned int nMaxSieveSize;
 static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
 static const CBigNum bnOne = 1;
+static const CBigNum bnTwo = 2;
+static const CBigNum bnConst8 = 8;
 static const CBigNum bnPrimeMax = (bnOne << 2000) - 1;
 static const CBigNum bnPrimeMin = (bnOne << 255);
 
@@ -127,7 +129,7 @@ public:
 		RtlZeroMemory(vfCompositeBiTwin, sizeof(uint8)*maskBytes);
 		nCandidateMultiplier = 0;
 		// init bn_constTwo
-		bn_constTwo.d = (unsigned int*)bignumData_constTwo;
+		bn_constTwo.d = (BN_ULONG*)bignumData_constTwo;
 		bn_constTwo.dmax = 0x200/4;
 		bn_constTwo.flags = BN_FLG_STATIC_DATA;
 		bn_constTwo.neg = 0; 

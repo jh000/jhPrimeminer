@@ -4,6 +4,7 @@
 #include"jhlib/JHLib.h"
 
 #include<stdio.h>
+#include<time.h>
 
 #include"sha256.h"
 #include"ripemd160.h"
@@ -11,12 +12,24 @@
 static const int PROTOCOL_VERSION = 70001;
 
 #include<openssl/bn.h>
+
+
+// our own improved versions of BN functions
+BIGNUM *BN2_mod_inverse(BIGNUM *in,	const BIGNUM *a, const BIGNUM *n, BN_CTX *ctx);
+int BN2_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor, BN_CTX *ctx);
+int BN2_num_bits(const BIGNUM *a);
+int BN2_rshift(BIGNUM *r, const BIGNUM *a, int n);
+
+// original primecoin BN stuff
 #include"uint256.h"
 #include"bignum2.h"
 //#include"bignum_custom.h"
 
 #include"prime.h"
 #include"jsonrpc.h"
+
+#include"xptServer.h"
+#include"xptClient.h"
 
 static const int64 COIN = 100000000;
 static const int64 CENT = 1000000;
@@ -59,8 +72,9 @@ typedef struct
 	uint256 blockHeaderHash;
 	CBigNum bnPrimeChainMultiplier;
 	// other
-	uint32 workDataHash;
 	serverData_t serverData;
+	uint32 threadIndex; // the index of the miner thread
+	bool xptMode;
 }primecoinBlock_t;
 
 extern jsonRequestTarget_t jsonRequestTarget; // rpc login data
@@ -70,7 +84,10 @@ bool error(const char *format, ...);
 bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlock);
 void primecoinBlock_generateHeaderHash(primecoinBlock_t* primecoinBlock, uint8 hashOutput[32]);
 uint32 _swapEndianessU32(uint32 v);
-uint32 jhMiner_getCurrentWorkHash();
-uint32 jhMiner_getCurrentWorkBlockHeight();
+uint32 jhMiner_getCurrentWorkBlockHeight(sint32 threadIndex);
 
 void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex);
+
+// direct access to share counters
+extern volatile int total_shares;
+extern volatile int valid_shares;

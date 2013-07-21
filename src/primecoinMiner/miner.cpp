@@ -17,26 +17,7 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 
 	static int startFactorList[4] =
 	{
-		//11,
-		//43,
-		//79,
-		//112
-		//7,7,7,7
-		//3209,3221,4789,5179
-		//7,7,7,7
-		//103,103,103,103	~1800
-		//43     ,43     ,43     ,43     
-		//67,67,67,67
-		
-		//107,107,107,107 ~1900 (2500 x32)
-		
-		//127,127,127,127 //~3000 (x32)
-
-		149,149,149,149 //~3150 (x32) 
-		//it seems to be not better than v0.21?
-		//173,173,173,173 // ~3150 (x32)
-		//191,191,191,191 // ~3050 (x32)
-		//151,151,151,151 // ~3150 (x32)
+		107,107,107,107
 	};
 	nPrimorialMultiplierStart = startFactorList[(threadIndex&3)];
 
@@ -59,27 +40,27 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 	CBigNum bnHashFactor;
 	Primorial(nPrimorialHashFactor, bnHashFactor);
 
-	while( GetTickCount() < nTime && primecoinBlock->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight() )
+	time_t unixTimeStart;
+	time(&unixTimeStart);
+	uint32 nTimeRollStart = primecoinBlock->timestamp;
+
+	while( GetTickCount() < nTime && primecoinBlock->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(primecoinBlock->threadIndex) )
 	{
-		// printf("nPrimorialMultiplier: %d\n", nPrimorialMultiplier);
-		//while (vNodes.empty())
-		//	MilliSleep(1000);
 
-		//
-		// Create new block
-		//
-		//unsigned int nTransactionsUpdatedLast = nTransactionsUpdated;
-		//CBlockIndex* pindexPrev = pindexBest;
-
-		//auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(reservekey));
-		//if (!pblocktemplate.get())
-		//	return;
-		//CBlock *pblock = &pblocktemplate->block;
-		//IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
-
-		//printf("Running PrimecoinMiner with %"PRIszu" transactions in block (%u bytes)\n", pblock->vtx.size(),
-		//	::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
-
+		if( primecoinBlock->xptMode )
+		{
+			// when using x.pushthrough, roll time
+			time_t unixTimeCurrent;
+			time(&unixTimeCurrent);
+			uint32 timeDif = unixTimeCurrent - unixTimeStart;
+			uint32 newTimestamp = nTimeRollStart + timeDif;
+			if( newTimestamp != primecoinBlock->timestamp )
+			{
+				primecoinBlock->timestamp = newTimestamp;
+				primecoinBlock->nonce = 0;
+				nPrimorialMultiplierStart = startFactorList[(threadIndex&3)];
+			}
+		}
 
 		primecoinBlock_generateHeaderHash(primecoinBlock, primecoinBlock->blockHeaderHash.begin());
 		//

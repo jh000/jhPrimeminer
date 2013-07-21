@@ -7,6 +7,7 @@
 // Prime Table
 //std::vector<unsigned int> vPrimes;
 uint32* vPrimes;
+uint32* vPrimesTwoInverse;
 uint32 vPrimesSize = 0;
 
 
@@ -71,6 +72,23 @@ void GeneratePrimeTable()
 	printf("\n");
 	free(vfComposite);
 	vPrimes = (uint32*)realloc(vPrimes, sizeof(uint32)*vPrimesSize);
+	// calculate two's inverse for all primes
+	vPrimesTwoInverse = (uint32*)malloc(sizeof(uint32)*vPrimesSize);
+	CBigNum bnTwo = 2;
+	// BN_CTX 
+	BIGNUM bn_twoInverse = {0};
+	BN_init(&bn_twoInverse);
+	BIGNUM bn_p = {0};
+	CAutoBN_CTX pctx;
+	for(uint32 i=0; i<vPrimesSize; i++)
+	{
+		BN_set_word(&bn_p, vPrimes[i]);
+		if (!BN_mod_inverse(&bn_twoInverse, &bnTwo, &bn_p, pctx))
+		{
+			BN_set_word(&bn_twoInverse, 0);
+		}
+		vPrimesTwoInverse[i] = (uint32)BN_get_word(&bn_twoInverse);
+	}
 }
 
 //// Get next prime number of p
@@ -177,10 +195,10 @@ void PrimorialAt(CBigNum& bn, CBigNum& bnPrimorial)
 static bool FermatProbablePrimalityTest(const CBigNum& n, unsigned int& nLength)
 {
 	CAutoBN_CTX pctx;
-	CBigNum a = 2; // base; Fermat witness
+	//CBigNum a = 2; // base; Fermat witness
 	CBigNum e = n - 1;
 	CBigNum r;
-	BN_mod_exp(&r, &a, &e, &n, pctx);
+	BN_mod_exp(&r, &bnTwo, &e, &n, pctx);
 	if (r == 1)
 		return true;
 	// Failed Fermat test, calculate fractional length
@@ -198,25 +216,34 @@ static bool FermatProbablePrimalityTest(const CBigNum& n, unsigned int& nLength)
 // Return values
 //   true: n is probable prime
 //   false: n is composite; set fractional length in the nLength output
+
 static bool EulerLagrangeLifchitzPrimalityTest(const CBigNum& n, bool fSophieGermain, unsigned int& nLength)
 {
 	CAutoBN_CTX pctx;
-	CBigNum a = 2;
+	//CBigNum a = 2;
 	CBigNum e = (n - 1) >> 1;
 	CBigNum r;
-	BN_mod_exp(&r, &a, &e, &n, pctx);
-	CBigNum nMod8 = n % 8;
+	BN_mod_exp(&r, &bnTwo, &e, &n, pctx);
+	uint32 nMod8U32 = 0;
+	if( n.top > 0 )
+		nMod8U32 = n.d[0]&7;
+	
+	// validate the optimization above:
+	//CBigNum nMod8 = n % bnConst8;
+	//if( CBigNum(nMod8U32) != nMod8 )
+	//	__debugbreak();
+
 	bool fPassedTest = false;
-	if (fSophieGermain && (nMod8 == 7)) // Euler & Lagrange
+	if (fSophieGermain && (nMod8U32 == 7)) // Euler & Lagrange
 		fPassedTest = (r == 1);
-	else if (fSophieGermain && (nMod8 == 3)) // Lifchitz
+	else if (fSophieGermain && (nMod8U32 == 3)) // Lifchitz
 		fPassedTest = ((r+1) == n);
-	else if ((!fSophieGermain) && (nMod8 == 5)) // Lifchitz
+	else if ((!fSophieGermain) && (nMod8U32 == 5)) // Lifchitz
 		fPassedTest = ((r+1) == n);
-	else if ((!fSophieGermain) && (nMod8 == 1)) // LifChitz
+	else if ((!fSophieGermain) && (nMod8U32 == 1)) // LifChitz
 		fPassedTest = (r == 1);
 	else
-		return error("EulerLagrangeLifchitzPrimalityTest() : invalid n %% 8 = %d, %s", nMod8.getint(), (fSophieGermain? "first kind" : "second kind"));
+		return error("EulerLagrangeLifchitzPrimalityTest() : invalid n %% 8 = %d, %s", nMod8U32, (fSophieGermain? "first kind" : "second kind"));
 
 	if (fPassedTest)
 		return true;
@@ -407,7 +434,6 @@ bool ProbablePrimeChainTest(const CBigNum& bnPrimeChainOrigin, unsigned int nBit
 	nChainLengthCunningham1 = 0;
 	nChainLengthCunningham2 = 0;
 	nChainLengthBiTwin = 0;
-
 	// Test for Cunningham Chain of first kind
 	ProbableCunninghamChainTest(bnPrimeChainOrigin-1, true, fFermatTest, nChainLengthCunningham1);
 	// Test for Cunningham Chain of second kind
@@ -450,7 +476,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 		(*psieve)->WeaveFastAll();
 		
 		//while ((*psieve)->WeaveOriginal() && GetTickCount() < sieveStopTimeLimit );
-		//printf("MineProbablePrimeChain() : new sieve (%u/%u) ready in %ums multiplier: %u\n", (*psieve)->GetCandidateCount(), nMaxSieveSize, (unsigned int) (GetTickCount() - nStart), bnFixedMultiplier);
+		// printf("MineProbablePrimeChain() : new sieve (%u/%u) ready in %ums multiplier: %u\n", (*psieve)->GetCandidateCount(), nMaxSieveSize, (unsigned int) (GetTickCount() - nStart), bnFixedMultiplier);
 	}
 
 	CBigNum bnChainOrigin;
@@ -460,7 +486,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 
 	//uint32 timeStop = GetTickCount() + 25000;
 	uint32 nTries = 0;
-	while ( nTries < 15000 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight() )
+	while ( nTries < 15000 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex) )
 	{
 		nTries++;
 		nTests++;
@@ -803,7 +829,7 @@ bool CSieveOfEratosthenes::WeaveOriginal()
 //}
 
 #define fastInitBignum(bignumVar, bignumData) \
-	bignumVar.d = (unsigned int*)bignumData; \
+	bignumVar.d = (BN_ULONG*)bignumData; \
 	bignumVar.dmax = 0x200/4; \
 	bignumVar.flags = BN_FLG_STATIC_DATA; \
 	bignumVar.neg = 0; \
@@ -937,7 +963,13 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 	fastInitBignum(bn_twoInverse, bignumData_twoInverse);
 	//fastInitBignum(bn_delta, bignumData_delta);
 	
-	
+	// this makes sure we start generating longer chains earlier, as it becomes incredible unlikely that we generate perfect network-difficulty chains (e.g. it's harder to generate 8.999 chains then to generate 9.0+ chains)
+	//if( ((nBits&0x00FFFFFF)+0x00020000)>=0x01000000 )
+	//	nBits = (nBits+0x00020000)&0xFF000000;
+
+	unsigned int nChainLength = TargetGetLength(nBits);
+	unsigned int nChainLengthX2 = nChainLength*2;
+
 	while( true )
 	{
 		if (nPrimeSeq >= vPrimesSize || vPrimes[nPrimeSeq] >= nSieveSize)
@@ -960,19 +992,21 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 		// debug: Code is correct until here
 
 		// Find the modulo inverse of fixed factor
-		if (!BN_mod_inverse(&bn_fixedInverse, &bnFixedFactor, &bn_p, pctx))
+		if (!BN2_mod_inverse(&bn_fixedInverse, &bnFixedFactor, &bn_p, pctx))
 			return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-		//CBigNum bnTwo = 2;
-		if (!BN_mod_inverse(&bn_twoInverse, &bn_constTwo, &bn_p, pctx))
-			return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-
 		
+		//CBigNum bnTwo = 2;
+		//if (!BN_mod_inverse(&bn_twoInverse, &bn_constTwo, &bn_p, pctx))
+		//	return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
+		//if( BN_cmp(&bn_twoInverse, &CBigNum(vPrimesTwoInverse[nPrimeSeq])) )
+		//	__debugbreak();
+		BN_set_word(&bn_twoInverse, vPrimesTwoInverse[nPrimeSeq]);
+
 		uint64 pU64 = (uint64)vPrimes[nPrimeSeq];
 		uint64 fixedInverseU64 = BN_get_word(&bn_fixedInverse);
 		uint64 twoInverseU64 = BN_get_word(&bn_twoInverse);
 		// Weave the sieve for the prime
-		unsigned int nChainLength = TargetGetLength(nBits);
-		for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
+		for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < nChainLengthX2; nBiTwinSeq++)
 		{
 			// Find the first number that's divisible by this prime
 			//BN_copy(&bn_tmp, &bn_p);

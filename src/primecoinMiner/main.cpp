@@ -4,8 +4,8 @@
 #include<ctime>
 
 primeStats_t primeStats = {0};
-int total_shares = 0;
-int valid_shares = 0;
+volatile int total_shares = 0;
+volatile int valid_shares = 0;
 unsigned int nMaxSieveSize;
 char* dt;
 
@@ -15,101 +15,6 @@ bool error(const char *format, ...)
 	//__debugbreak();
 	return false;
 }
-
-//customBuffer_t* list_primeTable; // alias vPrimes
-//uint32* vPrimes;
-//uint32 vPrimesSize;
-//
-////static const unsigned int nMaxSieveSize = 1000000u;
-////static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
-////static const CBigNum bnOne = 1;
-////static const CBigNum bnPrimeMax = (bnOne << 2000) - 1;
-////static const CBigNum bnPrimeMin = (bnOne << 255);
-//
-//void GeneratePrimeTable()
-//{
-//	static const unsigned int nPrimeTableLimit = nMaxSieveSize;
-//	//vPrimes.clear();
-//	vPrimesSize = 0;
-//	vPrimes = (uint32*)malloc(sizeof(uint32)*nPrimeTableLimit);
-//	// Generate prime table using sieve of Eratosthenes
-//	//std::vector<bool> vfComposite (nPrimeTableLimit, false);
-//	uint8* vfComposite = (uint8*)malloc(nPrimeTableLimit);
-//	RtlZeroMemory(vfComposite, nPrimeTableLimit);
-//	for (unsigned int nFactor = 2; nFactor * nFactor < nPrimeTableLimit; nFactor++)
-//	{
-//		if (vfComposite[nFactor])
-//			continue;
-//		for (unsigned int nComposite = nFactor * nFactor; nComposite < nPrimeTableLimit; nComposite += nFactor)
-//			vfComposite[nComposite] = true;
-//	}
-//	for (unsigned int n = 2; n < nPrimeTableLimit; n++)
-//		if (!vfComposite[n])
-//		{
-//			vPrimes[vPrimesSize] = n;
-//			vPrimesSize++;
-//			//customBuffer_add(list_primeTable, &n);//vPrimes.push_back(n);
-//		}
-//	printf("GeneratePrimeTable() : prime table [1, %d] generated with %lu primes", nPrimeTableLimit, vPrimesSize);
-//	//BOOST_FOREACH(unsigned int nPrime, vPrimes)
-//	//    printf(" %u", nPrime);
-//	printf("\n");
-//	free(vfComposite);
-//	vPrimes = (uint32*)realloc(vPrimes, sizeof(uint32)*vPrimesSize);
-//}
-//
-//// Compute Primorial number p#
-//void Primorial(unsigned int p, BIGNUM* bnPrimorial)
-//{
-//	__debugbreak();
-//	//Bignum_SetUINT32(bnPrimorial, 1);
-//	////bnPrimorial = 1;
-//	////BOOST_FOREACH(unsigned int nPrime, vPrimes)
-//	//BIGNUM bnTemp;
-//	//for(uint32 i=0; i<vPrimesSize; i++)
-//	//{
-//	//	if (vPrimes[i] > p)
-//	//		break;
-//	//	
-//	//	Bignum_SetUINT32(&bnTemp, vPrimes[i]);
-//	//	Bignum_Mul(bnPrimorial, bnPrimorial, &bnTemp);
-//	//	//bnPrimorial *= nPrime;
-//
-//	//}
-//}
-//
-//// Get next prime number of p
-//bool PrimeTableGetNextPrime(unsigned int* p)
-//{
-//	for(uint32 i=0; i<vPrimesSize; i++)
-//	{
-//		if (vPrimes[i] > *p)
-//		{
-//			*p = vPrimes[i];
-//			return true;
-//		}
-//	}
-//	return false;
-//}
-//
-//// Get previous prime number of p
-//bool PrimeTableGetPreviousPrime(unsigned int* p)
-//{
-//	uint32 nPrevPrime = 0;
-//	for(uint32 i=0; i<vPrimesSize; i++)
-//	{
-//		if (vPrimes[i] >= *p)
-//			break;
-//		nPrevPrime = vPrimes[i];
-//	}
-//	if (nPrevPrime)
-//	{
-//		*p = nPrevPrime;
-//		return true;
-//	}
-//	return false;
-//}
-
 
 uint32 _swapEndianessU32(uint32 v)
 {
@@ -168,18 +73,6 @@ void primecoinBlock_generateHeaderHash(primecoinBlock_t* primecoinBlock, uint8 h
 {
 	uint8 blockHashDataInput[512];
 	memcpy(blockHashDataInput, primecoinBlock, 80);
-
-	// swap endianness for SHA256
-	//for(uint32 i=0; i<80/4; i++)
-	//{
-	//	*(uint32*)(blockHashDataInput+i*4) = _swapEndianessU32(*(uint32*)(blockHashDataInput+i*4));
-	//}
-
-	//for(uint32 i=1; i<64/4; i++)
-	//{
-	//	*(uint32*)(blockHashDataInput+i*4) = _swapEndianessU32(*(uint32*)(blockHashDataInput+i*4));
-	//}
-
 	sha256_context ctx;
 	sha256_starts(&ctx);
 	sha256_update(&ctx, (uint8*)blockHashDataInput, 80);
@@ -193,28 +86,14 @@ void primecoinBlock_generateBlockHash(primecoinBlock_t* primecoinBlock, uint8 ha
 {
 	uint8 blockHashDataInput[512];
 	memcpy(blockHashDataInput, primecoinBlock, 80);
-	//sint32 lengthBN = primecoinBlock->bnPrimeChainMultiplier.dmax;
-	//
-	////memcpy(blockHashDataInput+80+4, primecoinBlock->bnPrimeChainMultiplier.d, lengthBN*4);
-	//for(uint32 i=0; i<lengthBN*4; i++)
-	//{
-	//	blockHashDataInput[80+4+i] = *((uint8*)primecoinBlock->bnPrimeChainMultiplier.d + (lengthBN*4-i-1));	
-	//}
-
 	uint32 writeIndex = 80;
-
 	sint32 lengthBN = 0;
 	std::vector<unsigned char> bnSerializeData = primecoinBlock->bnPrimeChainMultiplier.getvch();
-	
-
 	lengthBN = bnSerializeData.size();
-	//*(uint32*)(blockHashDataInput+80) = _swapEndianessU32(lengthBN); // this is always stored as big endian
 	*(uint8*)(blockHashDataInput+writeIndex) = (uint8)lengthBN;
 	writeIndex += 1;
-	
 	memcpy(blockHashDataInput+writeIndex, &bnSerializeData[0], lengthBN);
 	writeIndex += lengthBN;
-
 	sha256_context ctx;
 	sha256_starts(&ctx);
 	sha256_update(&ctx, (uint8*)blockHashDataInput, writeIndex);
@@ -224,234 +103,27 @@ void primecoinBlock_generateBlockHash(primecoinBlock_t* primecoinBlock, uint8 ha
 	sha256_finish(&ctx, hashOutput);
 }
 
-
-//bool CheckPrimeProofOfWork(BIGNUM* hashBlockHeader, unsigned int nBits, BIGNUM* bnPrimeChainMultiplier, unsigned int* nChainType, unsigned int* nChainLength);
-
-//#define ALLOC_SPEED_UP_BUFFERS		(32*5)
-//#define ALLOC_SPEED_UP_BUFFER_SIZE	(4096) // 4kb	
-//
-//__declspec( thread ) uint8* allocSpeedupBuffer;
-//__declspec( thread ) uint8* allocSpeedupBufferEnd;
-//__declspec( thread ) uint32 allocSpeedupMask[ALLOC_SPEED_UP_BUFFERS/32] = {0}; // bit not set -> free, bit set -> used
-////__declspec( thread ) uint32 allocSpeedupBufferLog[ALLOC_SPEED_UP_BUFFERS];
-////__declspec( thread ) uint32 allocSpeedupBufferLogTime[ALLOC_SPEED_UP_BUFFERS];
-//
-//uint32 inline _getFirstBitIndex(uint32 mask)
-//{
-//	unsigned long index;
-//	_BitScanForward(&index, mask);
-//	return index;
-//}
-//
-///*
-// * The mallocEx/reallocEx/freeEx code below was used to speed up memory allocation for bignums (or other OpenSSL CRYPTO stuff) by a factor of 10x
-// * It worked quite well, but due to a memory leak of unknown origin I had to disable it.
-// * The miner seems to occasionally allocate a bignum but never free it again, thus filling the limited 'allocSpeedupBuffer' until it is full forcing the mallocEx method to use standard malloc()
-// */
-//void* mallocEx(size_t size,const char * file,int lineNumber)
-//{
-//	if( size <= ALLOC_SPEED_UP_BUFFER_SIZE)
-//	{
-//		// do a stack walk (debugging)
-//		//// stack walk
-//		//uint32* stackOffset = ((uint32*)_AddressOfReturnAddress())-1;
-//		//uint32 returnAddress = stackOffset[1];
-//		//uint32 epbBaseAddress = stackOffset[0];
-//		//uint32 epbBaseAddressOrg = epbBaseAddress;
-//		//uint32 stackHash = returnAddress;
-//		//sint32 stackDif = (sint32)((uint32)stackOffset - epbBaseAddress);
-//		//if( stackDif < 0 ) stackDif = -stackDif;
-//		//if( stackDif <= 1024*800 )
-//		//{
-//		//	for(sint32 c=0; c<12; c++)
-//		//	{
-//		//		stackDif = (sint32)((uint32)stackOffset - epbBaseAddress);
-//		//		if( stackDif < 0 ) stackDif = -stackDif;
-//		//		if( stackDif >= 1024*800 )
-//		//			break;
-//		//		stackOffset = (uint32*)(epbBaseAddress);
-//		//		returnAddress = stackOffset[1];
-//		//		epbBaseAddress = stackOffset[0];
-//		//		if( returnAddress == NULL || epbBaseAddress == NULL )
-//		//			break;
-//		//		stackHash += returnAddress;
-//		//	}
-//		//}
-//		//// end of stack walk
-//		for(uint32 i=0; i<(ALLOC_SPEED_UP_BUFFERS/32); i++)
-//		{
-//			if( allocSpeedupMask[i] != 0xFFFFFFFF )
-//			{
-//				uint32 bufferIndex = _getFirstBitIndex(~allocSpeedupMask[i]);
-//				if( allocSpeedupMask[i] & (1<<bufferIndex) )
-//					__debugbreak();
-//				allocSpeedupMask[i] |= (1<<bufferIndex);
-//				//allocSpeedupBufferLog[i*32+bufferIndex] = stackHash;
-//				//allocSpeedupBufferLogTime[i*32+bufferIndex] = GetTickCount();
-//
-//				return allocSpeedupBuffer + (i*32+bufferIndex)*ALLOC_SPEED_UP_BUFFER_SIZE;
-//			}
-//		}
-//		//printf("All used :( (Stack Hash: %08X)\n", stackHash);
-//	}
-//	return malloc(size);
-//}
-//
-//void freeEx(void* buffer)
-//{
-//	if( buffer >= allocSpeedupBuffer && buffer < allocSpeedupBufferEnd )
-//	{
-//		uint32 bufferIndex = ((uint8*)buffer - allocSpeedupBuffer)/ALLOC_SPEED_UP_BUFFER_SIZE;
-//		allocSpeedupMask[bufferIndex/32] &= ~(1<<(bufferIndex&31));
-//		return;
-//	}
-//	//printf("Free: %08x\n", buffer);
-//	free(buffer);
-//}
-//
-//void* reallocEx(void* buffer, size_t newSize,const char * file,int lineNumber)
-//{
-//	if( buffer >= allocSpeedupBuffer && buffer < allocSpeedupBufferEnd )
-//		__debugbreak(); // realloc not supported, but doesnt seem to be used anyways
-//	return realloc(buffer, newSize);
-//}
-//
-//void mallocSpeedupInit()
-//{
-//	if( allocSpeedupBuffer )
-//		return;
-//	allocSpeedupBuffer = (uint8*)malloc(ALLOC_SPEED_UP_BUFFERS*ALLOC_SPEED_UP_BUFFER_SIZE);
-//	allocSpeedupBufferEnd = allocSpeedupBuffer + (ALLOC_SPEED_UP_BUFFERS*ALLOC_SPEED_UP_BUFFER_SIZE);
-//}
-
-//
-//int main()
-//{
-//	allocSpeedupBuffer = (uint8*)malloc(ALLOC_SPEED_UP_BUFFERS*ALLOC_SPEED_UP_BUFFER_SIZE);
-//	allocSpeedupBufferEnd = allocSpeedupBuffer + (ALLOC_SPEED_UP_BUFFERS*ALLOC_SPEED_UP_BUFFER_SIZE);
-//	CRYPTO_set_mem_functions(mallocEx, reallocEx, freeEx);
-//	// init stuff
-//	//list_primeTable = customBuffer_create(128, sizeof(uint32));
-//	//vPrimesSize = 0;
-//	// generate primetable
-//	//GeneratePrimeTable();
-//	// todo
-//	GeneratePrimeTable();
-//	//__debugbreak();
-//
-//	// initial test block (block with index 100)
-//	primecoinBlock_t primecoinBlock = {0};
-//	primecoinBlock.version = 2;
-//	yPoolWorkMgr_parseHexStringLE("9e561a9eb64b3cbb15679075220f72597b49427f18694976dcabaabc84e0b3bb", 32*2, primecoinBlock.prevBlockHash);
-//	yPoolWorkMgr_parseHexStringLE("68b45436f76b7290bde0be84c3c1b695c3364ae44600b31e0cf86f5417bed09d", 32*2, primecoinBlock.merkleRoot);
-//	primecoinBlock.timestamp = 1373227362;
-//	primecoinBlock.nBits = 0x070089c3; // 8 bit int, 24 bit fract
-//	//0x70089c3;
-//	primecoinBlock.nonce = 159;
-//
-//	//uint8 blockHeaderHash[32];
-//	primecoinBlock_generateHeaderHash(&primecoinBlock, primecoinBlock.blockHeaderHash.begin());
-//
-//	char* primeOriginString = "5366987322649438967363624901152502571853327872155536768049073037591356928419358636181903971125351980";
-//	//uint256 primeCoinOriginData[512];
-//	//yPoolWorkMgr_parseHexString(primeOriginString, fStrLen(primeOriginString), primeCoinOriginData);
-//	//CBigNum(primeCoinOriginData);
-//	
-//
-//
-//	primecoinBlock.bnPrimeChainMultiplier = CBigNum(primeOriginString) / CBigNum(primecoinBlock.blockHeaderHash);
-//	CBigNum lolTest = CBigNum(primeOriginString) % CBigNum(primecoinBlock.blockHeaderHash);
-//	puts(lolTest.ToString().c_str());
-//	
-//
-//
-//	//bn_
-//	//important things: primeOriginString is NOT HEX...
-//
-//	uint8 blockHashFinal[32];
-//	primecoinBlock_generateBlockHash(&primecoinBlock, blockHashFinal);
-//
-//	puts("");
-//	for(uint32 i=0; i<128; i++)
-//	{
-//		if( (i&15)==0 )
-//			puts("");
-//		printf("%02x", *((uint8*)&primecoinBlock+i));
-//	}
-//
-//	BitcoinMiner(&primecoinBlock);
-//	//BIGNUM bn_blockHeaderHash;
-//	////Bignum_Read_BigEndian(&bn_blockHeaderHash, blockHeaderHash, 32);
-//	//Bignum_Read(&bn_blockHeaderHash, blockHeaderHash, 32);
-//
-//
-//	//char* primeOriginString = "5366987322649438967363624901152502571853327872155536768049073037591356928419358636181903971125351980";
-//	//uint8 primeCoinOriginData[512];
-//	//yPoolWorkMgr_parseHexString(primeOriginString, fStrLen(primeOriginString), primeCoinOriginData);
-//	//BIGNUM bnPrimeChainOrigin;
-//	//Bignum_Read(&bnPrimeChainOrigin, primeCoinOriginData, fStrLen(primeOriginString)/2);
-//	//Bignum_Div(&primecoinBlock.bnPrimeChainMultiplier, &bnPrimeChainOrigin, &bn_blockHeaderHash);
-//
-//	//// uint32 
-//
-//	//// bnPrimeChainMultiplier
-//
-//	//// start mining
-//	//static const unsigned int nPrimorialHashFactor = 7;
-//	//unsigned int nPrimorialMultiplier = nPrimorialHashFactor;
-//	//
-//	//while( true )
-//	//{
-//	//	BIGNUM bn_hashFactor;
-//	//	Primorial(nPrimorialHashFactor, &bn_hashFactor);
-//
-//	//	BIGNUM bn_temp1;
-//	//	// bn_blockHeaderHash
-//
-//	//	//while ((pblock->GetHeaderHash() < hashBlockHeaderLimit || CBigNum(pblock->GetHeaderHash()) % bnHashFactor != 0) && pblock->nNonce < 0xffff0000)
-//	//	//	pblock->nNonce++;
-//	//	//if (pblock->nNonce >= 0xffff0000)
-//	//	//	continue; <--- This will cause the extra nonce to increase (alias calculating a new merkle root)
-//
-//
-//	//	Bignum_Mod(&bn_temp1, &bn_blockHeaderHash, &bn_hashFactor);
-//
-//	//	Bignum_Print(&bn_blockHeaderHash);
-//	//	Bignum_Print(&bn_temp1);
-//	//	// pblock->GetHeaderHash() < hashBlockHeaderLimit <--- This makes sure the highest bit IS set?
-//
-//	//	// CheckProofOfWork(pblock->GetHeaderHash(), pblock->nBits, pblock->bnPrimeChainMultiplier, pblock->nPrimeChainType, pblock->nPrimeChainLength))
-//
-//	//	// "primechain" : "1CC07.04d7db",
-//	//	// the two values below dont have to be set, they are set by the call to CheckPrimeProofOfWork()?
-//	//	unsigned int nPrimeChainType = PRIME_CHAIN_CUNNINGHAM1;
-//	//	unsigned int nPrimeChainLength = 0x0704d7db;
-//
-//
-//	//	
-//	//	bool resultX = CheckPrimeProofOfWork(&bn_blockHeaderHash, _swapEndianessU32(primecoinBlock.bits), &primecoinBlock.bnPrimeChainMultiplier, &nPrimeChainType, &nPrimeChainLength);
-//	//	__debugbreak();
-//
-//	//	for(uint32 i=0; i<0x10000; i++)
-//	//	{
-//	//		
-//	//	}
-//	//}
-//	
-//
-//	return 0;
-//}
-
+typedef struct  
+{
+	bool dataIsValid;
+	uint8 data[128];
+	uint32 dataHash; // used to detect work data changes
+	uint8 serverData[32]; // contains data from the server 
+}workDataEntry_t;
 
 typedef struct  
 {
 	CRITICAL_SECTION cs;
-	bool dataIsValid;
+	uint8 protocolMode;
 	// xpm
-	uint8 data[128];
-	uint32 dataHash; // used to detect work data changes
-	uint8 serverData[32]; // contains data from the server 
+	workDataEntry_t workEntry[128]; // work data for each thread (up to 128)
+	// x.pushthrough
+	xptClient_t* xptClient;
 }workData_t;
+
+#define MINER_PROTOCOL_GETWORK		(1)
+#define MINER_PROTOCOL_STRATUM		(2)
+#define MINER_PROTOCOL_XPUSHTHROUGH	(3)
 
 workData_t workData;
 
@@ -466,48 +138,69 @@ jsonRequestTarget_t jsonRequestTarget; // rpc login data
  */
 bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlock)
 {
-	// prepare buffer to send
-	fStr_buffer4kb_t fStrBuffer_parameter;
-	fStr_t* fStr_parameter = fStr_alloc(&fStrBuffer_parameter, FSTR_FORMAT_UTF8);
-	fStr_append(fStr_parameter, "[\""); // \"]
-	fStr_addHexString(fStr_parameter, data, 256);
-	fStr_appendFormatted(fStr_parameter, "\",\"");
-	fStr_addHexString(fStr_parameter, (uint8*)&primecoinBlock->serverData, 32);
-	fStr_append(fStr_parameter, "\"]");
-	// send request
-	sint32 rpcErrorCode = 0;
-	jsonObject_t* jsonReturnValue = jsonClient_request(&jsonRequestTarget, "getwork", fStr_parameter, &rpcErrorCode);
-	if( jsonReturnValue == NULL )
+	if( workData.protocolMode == MINER_PROTOCOL_GETWORK )
 	{
-		printf("PushWorkResult failed :(\n");
-		return false;
-	}
-	else
-	{
-		// rpc call worked, sooooo.. is the bitcoin client happy with the result?
-		jsonObject_t* jsonReturnValueBool = jsonObject_getParameter(jsonReturnValue, "result");
-		if( jsonObject_isTrue(jsonReturnValueBool) )
+		// prepare buffer to send
+		fStr_buffer4kb_t fStrBuffer_parameter;
+		fStr_t* fStr_parameter = fStr_alloc(&fStrBuffer_parameter, FSTR_FORMAT_UTF8);
+		fStr_append(fStr_parameter, "[\""); // \"]
+		fStr_addHexString(fStr_parameter, data, 256);
+		fStr_appendFormatted(fStr_parameter, "\",\"");
+		fStr_addHexString(fStr_parameter, (uint8*)&primecoinBlock->serverData, 32);
+		fStr_append(fStr_parameter, "\"]");
+		// send request
+		sint32 rpcErrorCode = 0;
+		jsonObject_t* jsonReturnValue = jsonClient_request(&jsonRequestTarget, "getwork", fStr_parameter, &rpcErrorCode);
+		if( jsonReturnValue == NULL )
 		{
-			total_shares++;
-			valid_shares++;
-			time_t now = time(0);
-			dt = ctime(&now);
-			printf("Valid share found!");
-			printf("[ %d / %d ] %s",valid_shares, total_shares,dt);
-			jsonObject_freeObject(jsonReturnValue);
-			return true;
+			printf("PushWorkResult failed :(\n");
+			return false;
 		}
 		else
 		{
-			total_shares++;
-			// the server says no to this share :(
-			printf("Server rejected share (BlockHeight: %d/%d nBits: 0x%08X)\n", primecoinBlock->serverData.blockHeight, jhMiner_getCurrentWorkBlockHeight(), primecoinBlock->serverData.client_shareBits);
-			jsonObject_freeObject(jsonReturnValue);
-			return false;
+			// rpc call worked, sooooo.. is the server happy with the result?
+			jsonObject_t* jsonReturnValueBool = jsonObject_getParameter(jsonReturnValue, "result");
+			if( jsonObject_isTrue(jsonReturnValueBool) )
+			{
+				total_shares++;
+				valid_shares++;
+				time_t now = time(0);
+				dt = ctime(&now);
+				printf("Valid share found!");
+				printf("[ %d / %d ] %s",valid_shares, total_shares,dt);
+				jsonObject_freeObject(jsonReturnValue);
+				return true;
+			}
+			else
+			{
+				total_shares++;
+				// the server says no to this share :(
+				printf("Server rejected share (BlockHeight: %d/%d nBits: 0x%08X)\n", primecoinBlock->serverData.blockHeight, jhMiner_getCurrentWorkBlockHeight(primecoinBlock->threadIndex), primecoinBlock->serverData.client_shareBits);
+				jsonObject_freeObject(jsonReturnValue);
+				return false;
+			}
 		}
+		jsonObject_freeObject(jsonReturnValue);
+		return false;
 	}
-	jsonObject_freeObject(jsonReturnValue);
-	return false;
+	else if( workData.protocolMode == MINER_PROTOCOL_XPUSHTHROUGH )
+	{
+		// printf("Queue share\n");
+		xptShareToSubmit_t* xptShareToSubmit = (xptShareToSubmit_t*)malloc(sizeof(xptShareToSubmit_t));
+		memset(xptShareToSubmit, 0x00, sizeof(xptShareToSubmit_t));
+		memcpy(xptShareToSubmit->merkleRoot, primecoinBlock->merkleRoot, 32);
+		memcpy(xptShareToSubmit->prevBlockHash, primecoinBlock->prevBlockHash, 32);
+		xptShareToSubmit->nBits = primecoinBlock->nBits;
+		xptShareToSubmit->nonce = primecoinBlock->nonce;
+		xptShareToSubmit->nTime = primecoinBlock->timestamp;
+		// set multiplier
+		std::vector<unsigned char> bnSerializeData = primecoinBlock->bnPrimeChainMultiplier.getvch();
+		sint32 lengthBN = bnSerializeData.size();
+		memcpy(xptShareToSubmit->chainMultiplier, &bnSerializeData[0], lengthBN);
+		xptShareToSubmit->chainMultiplierSize = lengthBN;
+		// todo: Set stuff like sieve size
+		xptClient_foundShare(workData.xptClient, xptShareToSubmit);
+	}
 }
 
 void jhMiner_queryWork_primecoin()
@@ -520,7 +213,7 @@ void jhMiner_queryWork_primecoin()
 	if( jsonReturnValue == NULL )
 	{
 		printf("Getwork() failed with %serror code %d\n", (rpcErrorCode>1000)?"http ":"", rpcErrorCode>1000?rpcErrorCode-1000:rpcErrorCode);
-		workData.dataIsValid = false;
+		workData.workEntry[0].dataIsValid = false;
 		return;
 	}
 	else
@@ -534,69 +227,64 @@ void jhMiner_queryWork_primecoin()
 		if( jsonResult_data == NULL )
 		{
 			printf("Error :(\n");
-			workData.dataIsValid = false;
+			workData.workEntry[0].dataIsValid = false;
 			jsonObject_freeObject(jsonReturnValue);
 			return;
 		}
-		//printf("Success :)\nHere are some values from getwork:\n");
 		// data
 		uint32 stringData_length = 0;
 		uint8* stringData_data = jsonObject_getStringData(jsonResult_data, &stringData_length);
 		//printf("data: %.*s...\n", (sint32)min(48, stringData_length), stringData_data);
 
 		EnterCriticalSection(&workData.cs);
-		yPoolWorkMgr_parseHexString((char*)stringData_data, min(128*2, stringData_length), workData.data);
-		workData.dataIsValid = true;
+		yPoolWorkMgr_parseHexString((char*)stringData_data, min(128*2, stringData_length), workData.workEntry[0].data);
+		workData.workEntry[0].dataIsValid = true;
 		// get server data
 		uint32 stringServerData_length = 0;
 		uint8* stringServerData_data = jsonObject_getStringData(jsonResult_serverData, &stringServerData_length);
-		RtlZeroMemory(workData.serverData, 32);
+		RtlZeroMemory(workData.workEntry[0].serverData, 32);
 		if( jsonResult_serverData )
-			yPoolWorkMgr_parseHexString((char*)stringServerData_data, min(128*2, 32*2), workData.serverData);
+			yPoolWorkMgr_parseHexString((char*)stringServerData_data, min(128*2, 32*2), workData.workEntry[0].serverData);
 		// generate work hash
 		uint32 workDataHash = 0x5B7C8AF4;
 		for(uint32 i=0; i<stringData_length/2; i++)
 		{
 			workDataHash = (workDataHash>>29)|(workDataHash<<3);
-			workDataHash += (uint32)workData.data[i];
+			workDataHash += (uint32)workData.workEntry[0].data[i];
 		}
-		workData.dataHash = workDataHash;
+		workData.workEntry[0].dataHash = workDataHash;
 		LeaveCriticalSection(&workData.cs);
 		jsonObject_freeObject(jsonReturnValue);
 	}
 }
 
 /*
- * Returns the hash of the current work data (32bit block data hash)
+ * Returns the block height of the most recently received workload
  */
-uint32 jhMiner_getCurrentWorkHash()
+uint32 jhMiner_getCurrentWorkBlockHeight(sint32 threadIndex)
 {
-	return workData.dataHash;
+	if( workData.protocolMode == MINER_PROTOCOL_GETWORK )
+		return ((serverData_t*)workData.workEntry[0].serverData)->blockHeight;	
+	else
+		return ((serverData_t*)workData.workEntry[threadIndex].serverData)->blockHeight;
 }
 
 /*
- * Returns the block height of the most recently received workload
+ * Worker thread mainloop for getwork() mode
  */
-uint32 jhMiner_getCurrentWorkBlockHeight()
+int jhMiner_workerThread_getwork(int threadIndex)
 {
-	return ((serverData_t*)workData.serverData)->blockHeight;
-}
-
-int jhMiner_workerThread(int threadIndex)
-{
-	//mallocSpeedupInit();
 	while( true )
 	{
 		uint8 localBlockData[128];
 		// copy block data from global workData
 		uint32 workDataHash = 0;
 		uint8 serverData[32];
-		while( workData.dataIsValid == false ) Sleep(200);
+		while( workData.workEntry[0].dataIsValid == false ) Sleep(200);
 		EnterCriticalSection(&workData.cs);
-		memcpy(localBlockData, workData.data, 128);
+		memcpy(localBlockData, workData.workEntry[0].data, 128);
 		//seed = workData.seed;
-		memcpy(serverData, workData.serverData, 32);
-		workDataHash = workData.dataHash;
+		memcpy(serverData, workData.workEntry[0].serverData, 32);
 		LeaveCriticalSection(&workData.cs);
 		// swap endianess
 		for(uint32 i=0; i<128/4; i++)
@@ -608,10 +296,43 @@ int jhMiner_workerThread(int threadIndex)
 		memcpy(&primecoinBlock, localBlockData, 80);
 		// we abuse the timestamp field to generate an unique hash for each worker thread...
 		primecoinBlock.timestamp += threadIndex;
+		primecoinBlock.threadIndex = threadIndex;
+		primecoinBlock.xptMode = (workData.protocolMode == MINER_PROTOCOL_XPUSHTHROUGH);
 		// ypool uses a special encrypted serverData value to speedup identification of merkleroot and share data
 		memcpy(&primecoinBlock.serverData, serverData, 32);
-		// data hash to check for updated work data
-		primecoinBlock.workDataHash = workDataHash;
+		// start mining
+		BitcoinMiner(&primecoinBlock, threadIndex);
+		primecoinBlock.bnPrimeChainMultiplier = 0;
+	}
+	return 0;
+}
+
+/*
+ * Worker thread mainloop for xpt() mode
+ */
+int jhMiner_workerThread_xpt(int threadIndex)
+{
+	while( true )
+	{
+		uint8 localBlockData[128];
+		// copy block data from global workData
+		uint32 workDataHash = 0;
+		uint8 serverData[32];
+		while( workData.workEntry[threadIndex].dataIsValid == false ) Sleep(200);
+		EnterCriticalSection(&workData.cs);
+		memcpy(localBlockData, workData.workEntry[threadIndex].data, 128);
+		memcpy(serverData, workData.workEntry[threadIndex].serverData, 32);
+		workDataHash = workData.workEntry[threadIndex].dataHash;
+		LeaveCriticalSection(&workData.cs);
+		// convert raw data into primecoin block
+		primecoinBlock_t primecoinBlock = {0};
+		memcpy(&primecoinBlock, localBlockData, 80);
+		// we abuse the timestamp field to generate an unique hash for each worker thread...
+		primecoinBlock.timestamp += threadIndex;
+		primecoinBlock.threadIndex = threadIndex;
+		primecoinBlock.xptMode = (workData.protocolMode == MINER_PROTOCOL_XPUSHTHROUGH);
+		// ypool uses a special encrypted serverData value to speedup identification of merkleroot and share data
+		memcpy(&primecoinBlock.serverData, serverData, 32);
 		// start mining
 		//uint32 time1 = GetTickCount();
 		BitcoinMiner(&primecoinBlock, threadIndex);
@@ -656,8 +377,6 @@ void jhMiner_parseCommandline(int argc, char **argv)
 	{
 		char* argument = argv[cIdx];
 		cIdx++;
-		//sets default maxSieveSize
-		commandlineInput.sieveSize = 1000000;
 		if( memcmp(argument, "-o", 2)==0 || memcmp(argument, "-O", 2)==0 )
 		{
 			// -o
@@ -750,14 +469,153 @@ void jhMiner_parseCommandline(int argc, char **argv)
 	}
 }
 
+/*
+ * Mainloop when using getwork() mode
+ */
+int jhMiner_main_getworkMode()
+{
+	// start threads
+	for(sint32 threadIdx=0; threadIdx<commandlineInput.numThreads; threadIdx++)
+		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)jhMiner_workerThread_getwork, (LPVOID)threadIdx, 0, 0);
+	// main thread, query work every 8 seconds
+	sint32 loopCounter = 0;
+	while( true )
+	{
+		// query new work
+		jhMiner_queryWork_primecoin();
+		// calculate stats every second tick
+		if( loopCounter&1 )
+		{
+			double statsPassedTime = (double)(GetTickCount() - primeStats.primeLastUpdate);
+			if( statsPassedTime < 1.0 )
+				statsPassedTime = 1.0; // avoid division by zero
+			double primesPerSecond = (double)primeStats.primeChainsFound / (statsPassedTime / 1000.0);
+			primeStats.primeLastUpdate = GetTickCount();
+			primeStats.primeChainsFound = 0;
+			uint32 bestDifficulty = primeStats.bestPrimeChainDifficulty;
+			primeStats.bestPrimeChainDifficulty = 0;
+			double primeDifficulty = (double)bestDifficulty / (double)0x1000000;
+			if( workData.workEntry[0].dataIsValid )
+			{
+				primeStats.bestPrimeChainDifficultySinceLaunch = max(primeStats.bestPrimeChainDifficultySinceLaunch, primeDifficulty);
+				printf("primes/s: %d best difficulty: %f record: %f\n", (sint32)primesPerSecond, (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
+			}
+		}		
+		// wait and check some stats
+		uint32 time_updateWork = GetTickCount();
+		while( true )
+		{
+			uint32 passedTime = GetTickCount() - time_updateWork;
+			if( passedTime >= 4000 )
+				break;
+			Sleep(200);
+		}
+		loopCounter++;
+	}
+	return 0;
+}
+
+/*
+ * Mainloop when using xpt mode
+ */
+int jhMiner_main_xptMode()
+{
+	// start threads
+	for(sint32 threadIdx=0; threadIdx<commandlineInput.numThreads; threadIdx++)
+		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)jhMiner_workerThread_xpt, (LPVOID)threadIdx, 0, 0);
+	// main thread, don't query work, just wait and process
+	sint32 loopCounter = 0;
+	uint32 xptWorkIdentifier = 0xFFFFFFFF;
+	while( true )
+	{
+		// calculate stats every second tick
+		if( loopCounter&1 )
+		{
+			double statsPassedTime = (double)(GetTickCount() - primeStats.primeLastUpdate);
+			if( statsPassedTime < 1.0 )
+				statsPassedTime = 1.0; // avoid division by zero
+			double primesPerSecond = (double)primeStats.primeChainsFound / (statsPassedTime / 1000.0);
+			primeStats.primeLastUpdate = GetTickCount();
+			primeStats.primeChainsFound = 0;
+			uint32 bestDifficulty = primeStats.bestPrimeChainDifficulty;
+			primeStats.bestPrimeChainDifficulty = 0;
+			double primeDifficulty = (double)bestDifficulty / (double)0x1000000;
+			if( workData.workEntry[0].dataIsValid )
+			{
+				primeStats.bestPrimeChainDifficultySinceLaunch = max(primeStats.bestPrimeChainDifficultySinceLaunch, primeDifficulty);
+				printf("primes/s: %d best difficulty: %f record: %f\n", (sint32)primesPerSecond, (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
+			}
+		}
+		// wait and check some stats
+		uint32 time_updateWork = GetTickCount();
+		while( true )
+		{
+			uint32 passedTime = GetTickCount() - time_updateWork;
+			if( passedTime >= 4000 )
+				break;
+			xptClient_process(workData.xptClient);
+			char* disconnectReason = false;
+			if( workData.xptClient == NULL || xptClient_isDisconnected(workData.xptClient, &disconnectReason) )
+			{
+				// disconnected, mark all data entries as invalid
+				for(uint32 i=0; i<128; i++)
+					workData.workEntry[i].dataIsValid = false;
+				printf("xpt: Disconnected, auto reconnect in 30 seconds\n");
+				if( workData.xptClient && disconnectReason )
+					printf("xpt: Disconnect reason: %s\n", disconnectReason);
+				Sleep(30*1000);
+				if( workData.xptClient )
+					xptClient_free(workData.xptClient);
+				xptWorkIdentifier = 0xFFFFFFFF;
+				while( true )
+				{
+					workData.xptClient = xptClient_connect(&jsonRequestTarget, commandlineInput.numThreads);
+					if( workData.xptClient )
+						break;
+				}
+			}
+			// has the block data changed?
+			if( workData.xptClient && xptWorkIdentifier != workData.xptClient->workDataCounter )
+			{
+				// printf("New work\n");
+				xptWorkIdentifier = workData.xptClient->workDataCounter;
+				for(uint32 i=0; i<workData.xptClient->payloadNum; i++)
+				{
+					uint8 blockData[256];
+					memset(blockData, 0x00, sizeof(blockData));
+					*(uint32*)(blockData+0) = workData.xptClient->blockWorkInfo.version;
+					memcpy(blockData+4, workData.xptClient->blockWorkInfo.prevBlock, 32);
+					memcpy(blockData+36, workData.xptClient->workData[i].merkleRoot, 32);
+					*(uint32*)(blockData+68) = workData.xptClient->blockWorkInfo.nTime;
+					*(uint32*)(blockData+72) = workData.xptClient->blockWorkInfo.nBits;
+					*(uint32*)(blockData+76) = 0; // nonce
+					memcpy(workData.workEntry[i].data, blockData, 80);
+					((serverData_t*)workData.workEntry[i].serverData)->blockHeight = workData.xptClient->blockWorkInfo.height;
+					((serverData_t*)workData.workEntry[i].serverData)->nBitsForShare = workData.xptClient->blockWorkInfo.nBitsShare;
+					// is the data really valid?
+					if( workData.xptClient->blockWorkInfo.nTime > 0 )
+						workData.workEntry[i].dataIsValid = true;
+					else
+						workData.workEntry[i].dataIsValid = false;
+				}
+			}
+			Sleep(10);
+		}
+		loopCounter++;
+	}
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	// setup some default values
-	commandlineInput.port = 8332;
+	commandlineInput.port = 10034;
 	SYSTEM_INFO sysinfo;
 	GetSystemInfo( &sysinfo );
 	commandlineInput.numThreads = sysinfo.dwNumberOfProcessors;
 	commandlineInput.numThreads = max(commandlineInput.numThreads, 1);
+	commandlineInput.sieveSize = 1000000; // default maxSieveSize
 	// parse command lines
 	jhMiner_parseCommandline(argc, argv);
 	// Sets max sieve size
@@ -771,7 +629,7 @@ int main(int argc, char **argv)
 	
 	printf("\n");
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  jhPrimeMiner (v0.21 beta)                                    \xBA\n");
+	printf("\xBA  jhPrimeMiner (v0.3 beta)                                     \xBA\n");
 	printf("\xBA  author: JH (http://ypool.net)                                \xBA\n");
 	printf("\xBA  contributors: x3maniac                                       \xBA\n");
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
@@ -797,20 +655,6 @@ int main(int argc, char **argv)
 	}
 	void** ipListPtr = (void**)hostInfo->h_addr_list;
 	uint32 ip = 0xFFFFFFFF;
-//#ifdef _WIN64
-//	if( ipListPtr[0] )
-//	{
-//		ip = (uint32)*(uint8*)((uint8*)ipListPtr[0]+0);
-//		ip |= ((uint32)*(uint8*)((uint8*)ipListPtr[0]+1))<<8;
-//		ip |= ((uint32)*(uint8*)((uint8*)ipListPtr[0]+2))<<16;
-//		ip |= ((uint32)*(uint8*)((uint8*)ipListPtr[0]+3))<<24;
-//	}
-//#else
-//	if( ipListPtr[0] )
-//	{
-//		ip = *(uint32*)ipListPtr[0];
-//	}
-//#endif
 	if( ipListPtr[0] )
 	{
 		ip = *(uint32*)ipListPtr[0];
@@ -829,10 +673,10 @@ int main(int argc, char **argv)
 	// init stats
 	primeStats.primeLastUpdate = GetTickCount();
 	// setup thread count and print info
-	sint32 nThreads = commandlineInput.numThreads;
-	printf("Using %d threads\n", nThreads);
+	printf("Using %d threads\n", commandlineInput.numThreads);
 	printf("Username: %s\n", jsonRequestTarget.authUser);
 	printf("Password: %s\n", jsonRequestTarget.authPass);
+<<<<<<< HEAD
 	// initial query new work
 	jhMiner_queryWork_primecoin();
 	// start threads
@@ -846,40 +690,86 @@ int main(int argc, char **argv)
 	// main thread, query work every 8 seconds
 	sint32 loopCounter = 0;
 	while( true )
+=======
+	// decide protocol
+	if( commandlineInput.port == 10034 )
 	{
-		// query new work
+		// port 10034 indicates xpt protocol (in future we will also add a -o URL prefix)
+		workData.protocolMode = MINER_PROTOCOL_XPUSHTHROUGH;
+		printf("Using x.pushthrough protocol\n");
+	}
+	else
+	{
+		workData.protocolMode = MINER_PROTOCOL_GETWORK;
+		printf("Using GetWork() protocol\n");
+		printf("Warning: \n");
+		printf("   GetWork() is outdated and inefficient. You are losing mining performance\n");
+		printf("   by using it. If the pool supports it, consider switching to x.pushthrough.\n");
+		printf("   Just add the port :10034 to the -o parameter.\n");
+		printf("   Example: jhPrimeminer.exe -o http://poolurl.net:10034 ...\n");
+	}
+	// initial query new work / create new connection
+	if( workData.protocolMode == MINER_PROTOCOL_GETWORK )
+>>>>>>> New network protocol, speed improvements
+	{
 		jhMiner_queryWork_primecoin();
-		// calculate stats every second tick
-		if( loopCounter&1 )
+	}
+	else if( workData.protocolMode == MINER_PROTOCOL_XPUSHTHROUGH )
+	{
+		workData.xptClient = NULL;
+		// x.pushthrough initial connect & login sequence
+		while( true )
 		{
-			double statsPassedTime = (double)(GetTickCount() - primeStats.primeLastUpdate);
-			if( statsPassedTime < 1.0 )
-				statsPassedTime = 1.0; // avoid division by zero
-			double primesPerSecond = (double)primeStats.primeChainsFound / (statsPassedTime / 1000.0);
-			primeStats.primeLastUpdate = GetTickCount();
-			primeStats.primeChainsFound = 0;
-			uint32 bestDifficulty = primeStats.bestPrimeChainDifficulty;
-			primeStats.bestPrimeChainDifficulty = 0;
-			double primeDifficulty = (double)bestDifficulty / (double)0x1000000;
-			if( workData.dataIsValid )
+			// repeat connect & login until it is successful (with 30 seconds delay)
+			while ( true )
 			{
+<<<<<<< HEAD
 				primesPerSecondSum += primesPerSecond;
 				primesPerSecondCount += 1.0;
 				primeStats.bestPrimeChainDifficultySinceLaunch = max(primeStats.bestPrimeChainDifficultySinceLaunch, primeDifficulty);
 				printf("primes/s: %d, average: %d, best difficulty: %f, record: %f\n", (sint32)primesPerSecond, (sint32)(primesPerSecondSum / primesPerSecondCount), (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
+=======
+				workData.xptClient = xptClient_connect(&jsonRequestTarget, commandlineInput.numThreads);
+				if( workData.xptClient != NULL )
+					break;
+				printf("Failed to connect, retry in 30 seconds\n");
+				Sleep(1000*30);
+>>>>>>> New network protocol, speed improvements
 			}
-		}		
-		// wait and check some stats
-		uint32 time_updateWork = GetTickCount();
-		while( true )
-		{
-			uint32 passedTime = GetTickCount() - time_updateWork;
-			if( passedTime >= 4000 )
+			// make sure we are successfully authenticated
+			while( xptClient_isDisconnected(workData.xptClient, NULL) == false && xptClient_isAuthenticated(workData.xptClient) == false )
+			{
+				xptClient_process(workData.xptClient);
+				Sleep(1);
+			}
+			char* disconnectReason = NULL;
+			// everything went alright?
+			if( xptClient_isDisconnected(workData.xptClient, &disconnectReason) == true )
+			{
+				xptClient_free(workData.xptClient);
+				workData.xptClient = NULL;
 				break;
-			Sleep(200);
+			}
+			if( xptClient_isAuthenticated(workData.xptClient) == true )
+			{
+				break;
+			}
+			if( disconnectReason )
+				printf("xpt error: %s\n", disconnectReason);
+			// delete client
+			xptClient_free(workData.xptClient);
+			// try again in 30 seconds
+			printf("x.pushthrough authentication sequence failed, retry in 30 seconds\n");
+			Sleep(30*1000);
 		}
-		loopCounter++;
 	}
+	// enter different mainloops depending on protocol mode
+	if( workData.protocolMode == MINER_PROTOCOL_GETWORK )
+		return jhMiner_main_getworkMode();
+	else if( workData.protocolMode == MINER_PROTOCOL_XPUSHTHROUGH )
+		return jhMiner_main_xptMode();
+
+	return 0;
 }
 
 ///*
