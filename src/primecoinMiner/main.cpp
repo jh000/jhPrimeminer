@@ -676,21 +676,6 @@ int main(int argc, char **argv)
 	printf("Using %d threads\n", commandlineInput.numThreads);
 	printf("Username: %s\n", jsonRequestTarget.authUser);
 	printf("Password: %s\n", jsonRequestTarget.authPass);
-<<<<<<< HEAD
-	// initial query new work
-	jhMiner_queryWork_primecoin();
-	// start threads
-	for(sint32 threadIdx=0; threadIdx<nThreads; threadIdx++)
-		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)jhMiner_workerThread, (LPVOID)threadIdx, 0, 0);
-	
-	// for average primes/s since startup
-	double primesPerSecondSum = 0.0;
-	double primesPerSecondCount = 0.0;
-
-	// main thread, query work every 8 seconds
-	sint32 loopCounter = 0;
-	while( true )
-=======
 	// decide protocol
 	if( commandlineInput.port == 10034 )
 	{
@@ -710,7 +695,6 @@ int main(int argc, char **argv)
 	}
 	// initial query new work / create new connection
 	if( workData.protocolMode == MINER_PROTOCOL_GETWORK )
->>>>>>> New network protocol, speed improvements
 	{
 		jhMiner_queryWork_primecoin();
 	}
@@ -723,18 +707,11 @@ int main(int argc, char **argv)
 			// repeat connect & login until it is successful (with 30 seconds delay)
 			while ( true )
 			{
-<<<<<<< HEAD
-				primesPerSecondSum += primesPerSecond;
-				primesPerSecondCount += 1.0;
-				primeStats.bestPrimeChainDifficultySinceLaunch = max(primeStats.bestPrimeChainDifficultySinceLaunch, primeDifficulty);
-				printf("primes/s: %d, average: %d, best difficulty: %f, record: %f\n", (sint32)primesPerSecond, (sint32)(primesPerSecondSum / primesPerSecondCount), (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
-=======
 				workData.xptClient = xptClient_connect(&jsonRequestTarget, commandlineInput.numThreads);
 				if( workData.xptClient != NULL )
 					break;
 				printf("Failed to connect, retry in 30 seconds\n");
 				Sleep(1000*30);
->>>>>>> New network protocol, speed improvements
 			}
 			// make sure we are successfully authenticated
 			while( xptClient_isDisconnected(workData.xptClient, NULL) == false && xptClient_isAuthenticated(workData.xptClient) == false )
@@ -835,8 +812,6 @@ int mainPerformanceTest()
 	for(uint32 i=0; i<12; i++)
 		printf("%02x", fastSieveHash[i]);
 	puts("");
-
-
 	while( true ) Sleep(1000);
 	return 0;
 }
