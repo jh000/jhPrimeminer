@@ -96,7 +96,7 @@ int BN2_num_bits(const BIGNUM *a)
 	return ((i*BN_BITS2) + BN2_num_bits_word(a->d[i]));
 }
 
-int BN2_is_bit_set(const BIGNUM *a, int n)
+int inline BN2_is_bit_set(const BIGNUM *a, int n)
 {
 	int i,j;
 
@@ -106,6 +106,36 @@ int BN2_is_bit_set(const BIGNUM *a, int n)
 	j=n%BN_BITS2;
 	if (a->top <= i) return 0;
 	return (int)(((a->d[i])>>j)&((BN_ULONG)1));
+}
+
+/*
+ * Counts the number of set bits starting at a value of 1 then 2, 4, 8, 16...
+ * If a bit is not set, the method exits and returns the number of bits up to this bit
+ * a must not be zero
+ */
+int inline BN2_nz_num_unset_bits_from_lsb(const BIGNUM *a)
+{
+#ifdef _WIN32
+	sint32 bIdx = 0;
+	uint32 idx = 0;
+	sint32 maxIdx = a->top-1;
+	do 
+	{
+		_BitScanForward(&idx, a->d[bIdx]);
+		if( idx==0 )
+		{
+			if( bIdx >= maxIdx )
+				break;
+			continue;
+		}
+		else
+			break;
+	}while(true);
+	return bIdx*32+idx;
+	// _BitScanReverse
+#else
+	needs implementation
+#endif
 }
 
 
@@ -137,7 +167,7 @@ int BN2_sub(BIGNUM *r, const BIGNUM *a, const BIGNUM *b)
 
 	if (add)
 	{
-		if (!BN_uadd(r,a,b)) return(0);
+		if (!BN2_uadd(r,a,b)) return(0);
 		r->neg=neg;
 		return(1);
 	}
@@ -165,7 +195,7 @@ int BN2_nnmod(BIGNUM *r, const BIGNUM *m, const BIGNUM *d, BN_CTX *ctx)
 	/* like BN_mod, but returns non-negative remainder
 	* (i.e.,  0 <= r < |d|  always holds) */
 
-	if (!(BN_mod(r,m,d,ctx)))
+	if (!(BN2_div(NULL,r,m,d)))
 		return 0;
 	if (!r->neg)
 		return 1;
@@ -263,6 +293,138 @@ int BN2_rshift(BIGNUM *r, const BIGNUM *a, int n)
 	return(1);
 }
 
+int BN2_lshift1(BIGNUM *r, const BIGNUM *a)
+{
+	register BN_ULONG *ap,*rp,t,c;
+	int i;
+
+	bn_check_top(r);
+	bn_check_top(a);
+
+	if (r != a)
+	{
+		r->neg=a->neg;
+		if (bn_wexpand(r,a->top+1) == NULL) return(0);
+		r->top=a->top;
+	}
+	else
+	{
+		if (bn_wexpand(r,a->top+1) == NULL) return(0);
+	}
+	ap=a->d;
+	rp=r->d;
+	c=0;
+	for (i=0; i<a->top; i++)
+	{
+		t= *(ap++);
+		*(rp++)=((t<<1)|c)&BN_MASK2;
+		c=(t & BN_TBIT)?1:0;
+	}
+	if (c)
+	{
+		*rp=1;
+		r->top++;
+	}
+	bn_check_top(r);
+	return(1);
+}
+
+int BN2_lshift(BIGNUM *r, const BIGNUM *a, int n)
+{
+	int i,nw,lb,rb;
+	BN_ULONG *t,*f;
+	BN_ULONG l;
+
+	bn_check_top(r);
+	bn_check_top(a);
+
+	r->neg=a->neg;
+	nw=n/BN_BITS2;
+	if (bn_wexpand(r,a->top+nw+1) == NULL) return(0);
+	lb=n%BN_BITS2;
+	rb=BN_BITS2-lb;
+	f=a->d;
+	t=r->d;
+	t[a->top+nw]=0;
+	if (lb == 0)
+		for (i=a->top-1; i>=0; i--)
+			t[nw+i]=f[i];
+	else
+		for (i=a->top-1; i>=0; i--)
+		{
+			l=f[i];
+			t[nw+i+1]|=(l>>rb)&BN_MASK2;
+			t[nw+i]=(l<<lb)&BN_MASK2;
+		}
+		memset(t,0,nw*sizeof(t[0]));
+		/*	for (i=0; i<nw; i++)
+		t[i]=0;*/
+		r->top=a->top+nw+1;
+		bn_correct_top(r);
+		bn_check_top(r);
+		return(1);
+}
+
+/* unsigned add of b to a */
+int BN2_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b)
+{
+	int max,min,dif;
+	BN_ULONG *ap,*bp,*rp,carry,t1,t2;
+	const BIGNUM *tmp;
+
+	bn_check_top(a);
+	bn_check_top(b);
+
+	if (a->top < b->top)
+	{ tmp=a; a=b; b=tmp; }
+	max = a->top;
+	min = b->top;
+	dif = max - min;
+
+	if (bn_wexpand(r,max+1) == NULL)
+		return 0;
+
+	r->top=max;
+
+
+	ap=a->d;
+	bp=b->d;
+	rp=r->d;
+
+	carry=bn_add_words(rp,ap,bp,min);
+	rp+=min;
+	ap+=min;
+	bp+=min;
+
+	if (carry)
+	{
+		while (dif)
+		{
+			dif--;
+			t1 = *(ap++);
+			t2 = (t1+1) & BN_MASK2;
+			*(rp++) = t2;
+			if (t2)
+			{
+				carry=0;
+				break;
+			}
+		}
+		if (carry)
+		{
+			/* carry != 0 => dif == 0 */
+			*rp = 1;
+			r->top++;
+		}
+	}
+	if (dif && rp != ap)
+		while (dif--)
+			/* copy remaining words if ap != rp */
+			*(rp++) = *(ap++);
+	r->neg = 0;
+	bn_check_top(r);
+	return 1;
+}
 
 BIGNUM *BN2_mod_inverse(BIGNUM *in,
 						const BIGNUM *a, const BIGNUM *n, BN_CTX *ctx)
@@ -327,33 +489,29 @@ BIGNUM *BN2_mod_inverse(BIGNUM *in,
 			/* Now divide  B  by the maximum possible power of two in the integers,
 			* and divide  X  by the same value mod |n|.
 			* When we're done, (1) still holds. */
-			shift = 0;
-			while (!BN2_is_bit_set(B, shift)) /* note that 0 < B */
+			uint32 shiftAmount = BN2_nz_num_unset_bits_from_lsb(B);
+			shift = shiftAmount;
+			for(uint32 sa=0; sa<shiftAmount; sa++)
 			{
-				shift++;
-
 				if (BN_is_odd(X))
 				{
-					if (!BN_uadd(X, X, n)) goto err;
+					BN2_uadd(X, X, n);
 				}
 				/* now X is even, so we can easily divide it by two */
-				if (!BN2_rshift1(X, X)) goto err;
+				BN2_rshift1(X, X);
 			}
 			if (shift > 0)
 			{
 				if (!BN2_rshift(B, B, shift)) goto err;
 			}
-
-
 			/* Same for  A  and  Y.  Afterwards, (2) still holds. */
-			shift = 0;
-			while (!BN2_is_bit_set(A, shift)) /* note that 0 < A */
+			shiftAmount = BN2_nz_num_unset_bits_from_lsb(A);
+			shift = shiftAmount;
+			for(uint32 sa=0; sa<shiftAmount; sa++)
 			{
-				shift++;
-
 				if (BN_is_odd(Y))
 				{
-					if (!BN_uadd(Y, Y, n)) goto err;
+					if (!BN2_uadd(Y, Y, n)) goto err;
 				}
 				/* now Y is even */
 				if (!BN2_rshift1(Y, Y)) goto err;
@@ -378,7 +536,7 @@ BIGNUM *BN2_mod_inverse(BIGNUM *in,
 			if (BN_ucmp(B, A) >= 0)
 			{
 				/* -sign*(X + Y)*a == B - A  (mod |n|) */
-				if (!BN_uadd(X, X, Y)) goto err;
+				if (!BN2_uadd(X, X, Y)) goto err;
 				/* NB: we could use BN_mod_add_quick(X, X, Y, n), but that
 				* actually makes the algorithm slower */
 				if (!BN_usub(B, B, A)) goto err;
@@ -386,7 +544,7 @@ BIGNUM *BN2_mod_inverse(BIGNUM *in,
 			else
 			{
 				/*  sign*(X + Y)*a == A - B  (mod |n|) */
-				if (!BN_uadd(Y, Y, X)) goto err;
+				if (!BN2_uadd(Y, Y, X)) goto err;
 				/* as above, BN_mod_add_quick(Y, Y, X, n) would slow things down */
 				if (!BN_usub(A, A, B)) goto err;
 			}
@@ -415,7 +573,7 @@ BIGNUM *BN2_mod_inverse(BIGNUM *in,
 			else if (BN2_num_bits(A) == BN2_num_bits(B) + 1)
 			{
 				/* A/B is 1, 2, or 3 */
-				if (!BN_lshift1(T,B)) goto err;
+				if (!BN2_lshift1(T,B)) goto err;
 				if (BN_ucmp(A,T) < 0)
 				{
 					/* A < 2*B, so D=1 */
@@ -444,7 +602,7 @@ BIGNUM *BN2_mod_inverse(BIGNUM *in,
 			}
 			else
 			{
-				if (!BN2_div(D,M,A,B,ctx)) goto err;
+				if (!BN2_div(D,M,A,B)) goto err;
 			}
 
 			/* Now
@@ -488,11 +646,11 @@ BIGNUM *BN2_mod_inverse(BIGNUM *in,
 			{
 				if (BN_is_word(D,2))
 				{
-					if (!BN_lshift1(tmp,X)) goto err;
+					if (!BN2_lshift1(tmp,X)) goto err;
 				}
 				else if (BN_is_word(D,4))
 				{
-					if (!BN_lshift(tmp,X,2)) goto err;
+					if (!BN2_lshift(tmp,X,2)) goto err;
 				}
 				else if (D->top == 1)
 				{

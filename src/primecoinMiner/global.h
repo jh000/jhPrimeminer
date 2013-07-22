@@ -16,9 +16,18 @@ static const int PROTOCOL_VERSION = 70001;
 
 // our own improved versions of BN functions
 BIGNUM *BN2_mod_inverse(BIGNUM *in,	const BIGNUM *a, const BIGNUM *n, BN_CTX *ctx);
-int BN2_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor, BN_CTX *ctx);
+int BN2_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor);
 int BN2_num_bits(const BIGNUM *a);
 int BN2_rshift(BIGNUM *r, const BIGNUM *a, int n);
+int BN2_lshift(BIGNUM *r, const BIGNUM *a, int n);
+int BN2_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
+
+#define fastInitBignum(bignumVar, bignumData) \
+	bignumVar.d = (BN_ULONG*)bignumData; \
+	bignumVar.dmax = 0x200/4; \
+	bignumVar.flags = BN_FLG_STATIC_DATA; \
+	bignumVar.neg = 0; \
+	bignumVar.top = 1; 
 
 // original primecoin BN stuff
 #include"uint256.h"
@@ -91,3 +100,5 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex);
 // direct access to share counters
 extern volatile int total_shares;
 extern volatile int valid_shares;
+
+extern __declspec( thread ) BN_CTX* pctx;

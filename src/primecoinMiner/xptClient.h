@@ -2,6 +2,7 @@ typedef struct
 {
 	uint8 merkleRoot[32];
 	uint8 prevBlockHash[32];
+	uint32 version;
 	uint32 nonce;
 	uint32 nTime;
 	uint32 nBits;

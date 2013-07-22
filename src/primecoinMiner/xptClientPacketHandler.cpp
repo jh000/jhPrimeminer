@@ -49,6 +49,7 @@ bool xptClient_processPacket_blockData1(xptClient_t* xptClient)
 	xptPacketbuffer_beginReadPacket(xptClient->recvBuffer);
 	xptClient->workDataValid = false;
 	// add general block info
+	xptClient->blockWorkInfo.version = xptPacketbuffer_readU32(xptClient->recvBuffer, &recvError);			// version
 	xptClient->blockWorkInfo.height = xptPacketbuffer_readU32(xptClient->recvBuffer, &recvError);			// block height
 	xptClient->blockWorkInfo.nBits = xptPacketbuffer_readU32(xptClient->recvBuffer, &recvError);			// nBits
 	xptClient->blockWorkInfo.nBitsShare = xptPacketbuffer_readU32(xptClient->recvBuffer, &recvError);		// nBitsRecommended / nBitsShare

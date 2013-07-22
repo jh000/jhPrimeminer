@@ -37,7 +37,7 @@
  *     rm->neg == num->neg                 (unless the remainder is zero)
  * If 'dv' or 'rm' is NULL, the respective value is not returned.
  */
-int BN2_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor, BN_CTX *ctx)
+int BN2_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor)
 	{
 	int norm_shift,i,loop;
 	BIGNUM *tmp,wnum,*snum,*sdiv,*res;
@@ -45,6 +45,7 @@ int BN2_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor, BN
 	BN_ULONG d0,d1;
 	int num_n,div_n;
 	int no_branch=0;
+
 
 	/* Invalid zero-padding would have particularly bad consequences
 	 * in the case of 'num', so don't just rely on bn_check_top() for this one
@@ -76,22 +77,44 @@ int BN2_div(BIGNUM *dv, BIGNUM *rm, const BIGNUM *num, const BIGNUM *divisor, BN
 		return(1);
 		}
 
-	BN_CTX_start(ctx);
-	tmp=BN_CTX_get(ctx);
-	snum=BN_CTX_get(ctx);
-	sdiv=BN_CTX_get(ctx);
+
+
+
+	uint32 bignumData_d1[0x200/4];
+	uint32 bignumData_d2[0x200/4];
+	uint32 bignumData_d3[0x200/4];
+	uint32 bignumData_d4[0x200/4];
+	//uint32 bignumData_d5[0x200/4];
+	BIGNUM bn_d1;
+	BIGNUM bn_d2;
+	BIGNUM bn_d3;
+	BIGNUM bn_d4;
+	//BIGNUM bn_d5;
+	fastInitBignum(bn_d1, bignumData_d1);
+	fastInitBignum(bn_d2, bignumData_d2);
+	fastInitBignum(bn_d3, bignumData_d3);
+	fastInitBignum(bn_d4, bignumData_d4);
+	//fastInitBignum(bn_d5, bignumData_d5);
+
+
+	//BN_CTX_start(ctx);
+	tmp=&bn_d1;
+	snum=&bn_d2;
+	sdiv=&bn_d3;
 	if (dv == NULL)
-		res=BN_CTX_get(ctx);
-	else	res=dv;
+		res=&bn_d4;//__debugbreak();//res=BN_CTX_get(ctx);
+	else
+		res=dv;
+
 	if (sdiv == NULL || res == NULL || tmp == NULL || snum == NULL)
 		goto err;
 
 	/* First we normalise the numbers */
 	norm_shift=BN_BITS2-((BN2_num_bits(divisor))%BN_BITS2);
-	if (!(BN_lshift(sdiv,divisor,norm_shift))) goto err;
+	if (!(BN2_lshift(sdiv,divisor,norm_shift))) goto err;
 	sdiv->neg=0;
 	norm_shift+=BN_BITS2;
-	if (!(BN_lshift(snum,num,norm_shift))) goto err;
+	if (!(BN2_lshift(snum,num,norm_shift))) goto err;
 	snum->neg=0;
 
 	if (no_branch)
@@ -291,10 +314,10 @@ X) -> 0x%08X\n",
 		bn_check_top(rm);
 		}
 	if (no_branch)	bn_correct_top(res);
-	BN_CTX_end(ctx);
+	//BN_CTX_end(ctx);
 	return(1);
 err:
 	bn_check_top(rm);
-	BN_CTX_end(ctx);
+	//BN_CTX_end(ctx);
 	return(0);
 	}

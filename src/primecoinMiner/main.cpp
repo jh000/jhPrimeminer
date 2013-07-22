@@ -190,6 +190,7 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 		memset(xptShareToSubmit, 0x00, sizeof(xptShareToSubmit_t));
 		memcpy(xptShareToSubmit->merkleRoot, primecoinBlock->merkleRoot, 32);
 		memcpy(xptShareToSubmit->prevBlockHash, primecoinBlock->prevBlockHash, 32);
+		xptShareToSubmit->version = primecoinBlock->version;
 		xptShareToSubmit->nBits = primecoinBlock->nBits;
 		xptShareToSubmit->nonce = primecoinBlock->nonce;
 		xptShareToSubmit->nTime = primecoinBlock->timestamp;
@@ -199,7 +200,8 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 		memcpy(xptShareToSubmit->chainMultiplier, &bnSerializeData[0], lengthBN);
 		xptShareToSubmit->chainMultiplierSize = lengthBN;
 		// todo: Set stuff like sieve size
-		xptClient_foundShare(workData.xptClient, xptShareToSubmit);
+		if( workData.xptClient )
+			xptClient_foundShare(workData.xptClient, xptShareToSubmit);
 	}
 }
 
@@ -629,7 +631,7 @@ int main(int argc, char **argv)
 	
 	printf("\n");
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  jhPrimeMiner (v0.3 beta)                                     \xBA\n");
+	printf("\xBA  jhPrimeMiner (v0.31 beta)                                    \xBA\n");
 	printf("\xBA  author: JH (http://ypool.net)                                \xBA\n");
 	printf("\xBA  contributors: x3maniac                                       \xBA\n");
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
@@ -639,6 +641,8 @@ int main(int argc, char **argv)
 	SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
 	// init memory speedup (if not already done in preMain)
 	//mallocSpeedupInit();
+	if( pctx == NULL )
+		pctx = BN_CTX_new();
 	// init prime table
 	GeneratePrimeTable();
 	// init winsock

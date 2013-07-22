@@ -164,8 +164,10 @@ bool jsonRpcServer_receiveData(jsonRpcServer_t* jrs, jsonRpcClient_t* client)
 		{
 			// did we receive the end of the header already?
 			sint32 scanStart = (sint32)client->recvIndex - (sint32)r;
-			scanStart = max(scanStart-4, 0);
-			for(uint32 s=scanStart; s<=(client->recvIndex-4); s++)
+			scanStart = max(scanStart-8, 0);
+			sint32 scanEnd = (sint32)(client->recvIndex);
+			scanEnd = max(scanEnd-4, 0);
+			for(sint32 s=scanStart; s<=scanEnd; s++)
 			{
 				// is header end?
 				if( client->recvBuffer[s+0] == '\r' &&

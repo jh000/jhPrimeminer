@@ -7,7 +7,8 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 	//printf("PrimecoinMiner started\n");
 	//SetThreadPriority(THREAD_PRIORITY_LOWEST);
 	//RenameThread("primecoin-miner");
-
+	if( pctx == NULL )
+		pctx = BN_CTX_new();
 	// Each thread has its own key and counter
 	//CReserveKey reservekey(pwallet);
 	unsigned int nExtraNonce = 0;
@@ -17,7 +18,9 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 
 	static int startFactorList[4] =
 	{
+		//7,7,7,7 <-- ??
 		107,107,107,107
+		// 9697,9697,9697,9697
 	};
 	nPrimorialMultiplierStart = startFactorList[(threadIndex&3)];
 
@@ -131,13 +134,26 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		//psieve = NULL;
 		nRoundTests += nTests;
 		nRoundPrimesHit += nPrimesHit;
-
 		// added this
-		if( nPrimorialMultiplier >= 800 )
+		/*if( nPrimorialMultiplier >= 800 )
 		{
 			primecoinBlock->nonce++;
 			nPrimorialMultiplier = nPrimorialMultiplierStart;
-		}
+		}*/
+
+		//if( nPrimorialMultiplier >= 800 )
+		//{
+		//	primecoinBlock->nonce++;
+		//	nPrimorialMultiplier = nPrimorialMultiplierStart;
+		//}
+
+		//if( primecoinBlock->nonce >= 0x100 )
+		//{
+		//	printf("Base reset\n");
+		//	primecoinBlock->nonce = 0;
+		//	nPrimorialMultiplier = nPrimorialMultiplierStart;
+		//}
+
 		primecoinBlock->nonce++;
 		loopCount++;
 	}
