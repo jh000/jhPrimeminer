@@ -3,11 +3,12 @@
 // see the accompanying file COPYING
 
 #include "global.h"
-
+/* removed dep for git until fully working.
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 
 #include "cuda\mainkernel.h"
+
 
 //check for cuda error and initilize
 void checkForCudaError(const char* desc)
@@ -20,7 +21,7 @@ void checkForCudaError(const char* desc)
     }
 }
 
-/*template function for array allocation on the device*/
+//template function for array allocation on the device
 template <typename T>
 T *newDevicePointer(size_t size)
 {
@@ -37,7 +38,7 @@ int initializeCUDA(int device)
 	printf("Init Cuda Device: %d\n",device);
     return 0;
 }
-
+*/
 // Prime Table
 //std::vector<unsigned int> vPrimes;
 uint32* vPrimes;

@@ -11,8 +11,8 @@
 
 #include <mpirxx.h>
 
-#include <gmp.h>
-#include <gmpxx.h>
+#include "mpir\gmp.h"
+#include "mpir\gmpxx.h"
 
 
 
@@ -51,7 +51,7 @@ int BN2_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
 static const int64 COIN = 100000000;
 static const int64 CENT = 1000000;
 
-int initializeCUDA(int device);
+//int initializeCUDA(int device);
 
 typedef struct  
 {

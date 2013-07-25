@@ -650,7 +650,7 @@ int main(int argc, char **argv)
 	printf("Launching miner...\n");
 	//added cuda option -cuda
 	if(commandlineInput.cuda){
-		initializeCUDA(0);
+		//initializeCUDA(0);
 	}
 	// set priority lower so the user still can do other things
 	SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
