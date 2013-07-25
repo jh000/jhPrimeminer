@@ -88,7 +88,10 @@ void primecoinBlock_generateBlockHash(primecoinBlock_t* primecoinBlock, uint8 ha
 	memcpy(blockHashDataInput, primecoinBlock, 80);
 	uint32 writeIndex = 80;
 	sint32 lengthBN = 0;
-	std::vector<unsigned char> bnSerializeData = primecoinBlock->bnPrimeChainMultiplier.getvch();
+	CBigNum bnPrimeChainMultiplier;
+	bnPrimeChainMultiplier.SetHex(primecoinBlock->bnPrimeChainMultiplier.get_str(16));
+
+	std::vector<unsigned char> bnSerializeData = bnPrimeChainMultiplier.getvch();
 	lengthBN = bnSerializeData.size();
 	*(uint8*)(blockHashDataInput+writeIndex) = (uint8)lengthBN;
 	writeIndex += 1;
@@ -195,7 +198,10 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 		xptShareToSubmit->nonce = primecoinBlock->nonce;
 		xptShareToSubmit->nTime = primecoinBlock->timestamp;
 		// set multiplier
-		std::vector<unsigned char> bnSerializeData = primecoinBlock->bnPrimeChainMultiplier.getvch();
+		CBigNum bnPrimeChainMultiplier;
+		bnPrimeChainMultiplier.SetHex(primecoinBlock->bnPrimeChainMultiplier.get_str(16));
+
+		std::vector<unsigned char> bnSerializeData = bnPrimeChainMultiplier.getvch();
 		sint32 lengthBN = bnSerializeData.size();
 		memcpy(xptShareToSubmit->chainMultiplier, &bnSerializeData[0], lengthBN);
 		xptShareToSubmit->chainMultiplierSize = lengthBN;
@@ -352,6 +358,7 @@ typedef struct
 	sint32 port;
 	sint32 numThreads;
 	sint32 sieveSize;
+	bool cuda;
 }commandlineInput_t;
 
 commandlineInput_t commandlineInput = {0};
@@ -452,6 +459,10 @@ void jhMiner_parseCommandline(int argc, char **argv)
 				ExitProcess(0);
 			}
 			cIdx++;
+		}
+		else if( memcmp(argument, "-cuda", 5)==0 || memcmp(argument, "--cuda", 6)==0 )
+		{
+			commandlineInput.cuda = true;
 		}
 		else if( memcmp(argument, "-help", 5)==0 || memcmp(argument, "--help", 6)==0 )
 		{
@@ -637,6 +648,10 @@ int main(int argc, char **argv)
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
 	printf("\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC\n");
 	printf("Launching miner...\n");
+	//added cuda option -cuda
+	if(commandlineInput.cuda){
+		initializeCUDA(0);
+	}
 	// set priority lower so the user still can do other things
 	SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
 	// init memory speedup (if not already done in preMain)
@@ -790,7 +805,7 @@ int mainPerformanceTest()
 	uint32 nBits = 0x07fb8bcc;
 	uint256 blockHashHeader;
 	yPoolWorkMgr_parseHexString("eed69c071ac2634ffc2a9e73177d1c5fad92fdf06f6d711c2f04877906ad6aef", 32*2, blockHashHeader.begin());
-	CBigNum fixedMultiplier = CBigNum(0xB);
+	mpz_class fixedMultiplier = mpz_class(0xB);
 
 	uint8 orgSieveHash[32];
 	uint8 fastSieveHash[32];

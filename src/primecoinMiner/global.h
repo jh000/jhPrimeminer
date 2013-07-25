@@ -8,6 +8,14 @@
 
 #include"sha256.h"
 #include"ripemd160.h"
+
+#include <mpirxx.h>
+
+#include <gmp.h>
+#include <gmpxx.h>
+
+
+
 //#include"bignum_custom.h"
 static const int PROTOCOL_VERSION = 70001;
 
@@ -43,6 +51,7 @@ int BN2_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
 static const int64 COIN = 100000000;
 static const int64 CENT = 1000000;
 
+int initializeCUDA(int device);
 
 typedef struct  
 {
@@ -79,7 +88,7 @@ typedef struct
 	uint32	nonce;
 	// GetHeaderHash() goes up to this offset (4+32+32+4+4+4=80 bytes)
 	uint256 blockHeaderHash;
-	CBigNum bnPrimeChainMultiplier;
+	mpz_class bnPrimeChainMultiplier;
 	// other
 	serverData_t serverData;
 	uint32 threadIndex; // the index of the miner thread
