@@ -1,0 +1,318 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectName>jhPrimeminer</ProjectName>
+    <ProjectGuid>{51766D4B-6DD0-428F-8781-05F23E8ED221}</ProjectGuid>
+    <RootNamespace>primecoinMiner</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)\bin\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Configuration)\</IntDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\</IntDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)\bin\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Configuration)\</IntDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)\bin\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>.\includes\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>lib\openssl\libeay32MT.lib;lib\openssl\ssleay32MT.lib;lib\mpir\Debug32\mpir.lib;lib\mpir\Debug32\mpirxx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>.\includes\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>lib\openssl64\libeay32MT.lib;lib\openssl64\ssleay32MT.lib;lib\mpir64\Debug64\mpir.lib;lib\mpir64\Debug64\mpirxx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <TargetMachine>MachineX64</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OmitFramePointers>false</OmitFramePointers>
+      <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
+      <AdditionalIncludeDirectories>.\includes\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>lib\openssl\libeay32MT.lib;lib\openssl\ssleay32MT.lib;lib\mpir\Release32\mpir.lib;lib\mpir\Release32\mpirxx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <TargetMachine>MachineX86</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <AdditionalIncludeDirectories>.\includes\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>lib\openssl64\libeay32MT.lib;lib\openssl64\ssleay32MT.lib;lib\mpir64\Release64\mpir.lib;lib\mpir64\Release64\mpirxx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <TargetMachine>MachineX64</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="bn2.cpp" />
+    <ClCompile Include="bn2_div.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="miner.cpp" />
+    <ClCompile Include="prime2.cpp" />
+    <ClCompile Include="jhlib\bmp.cpp" />
+    <ClCompile Include="jhlib\customBuffer.cpp" />
+    <ClCompile Include="jhlib\fastSorter.cpp" />
+    <ClCompile Include="jhlib\fastString.cpp" />
+    <ClCompile Include="jhlib\fastString_eprintf.cpp" />
+    <ClCompile Include="jhlib\fileMgr.cpp" />
+    <ClCompile Include="jhlib\fMath.cpp" />
+    <ClCompile Include="jhlib\hashTable_uint32.cpp" />
+    <ClCompile Include="jhlib\msgQueue.cpp" />
+    <ClCompile Include="jhlib\packetBuffer.cpp" />
+    <ClCompile Include="jhlib\perlinNoise.cpp" />
+    <ClCompile Include="jhlib\sData.cpp" />
+    <ClCompile Include="jhlib\simpleHTTP.cpp" />
+    <ClCompile Include="jhlib\simpleList.cpp" />
+    <ClCompile Include="jhlib\streamWrapper.cpp" />
+    <ClCompile Include="jhlib\tgaLib.cpp" />
+    <ClCompile Include="ripemd160.cpp" />
+    <ClCompile Include="sha256.cpp" />
+    <ClCompile Include="includes\openssl\applink.c" />
+    <ClCompile Include="jsonBuilder.cpp" />
+    <ClCompile Include="jsonClient.cpp" />
+    <ClCompile Include="jsonObject.cpp" />
+    <ClCompile Include="jsonParser.cpp" />
+    <ClCompile Include="jsonrpc.cpp" />
+    <ClCompile Include="xptClient.cpp" />
+    <ClCompile Include="xptClientPacketHandler.cpp" />
+    <ClCompile Include="xptPacketbuffer.cpp" />
+    <ClCompile Include="xptServer.cpp" />
+    <ClCompile Include="xptServerPacketHandler.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="cuda\compile.h" />
+    <ClInclude Include="cuda\cuda_string.h" />
+    <ClInclude Include="cuda\digit.h" />
+    <ClInclude Include="cuda\mainkernel.h" />
+    <ClInclude Include="cuda\mpz.h" />
+    <ClInclude Include="global.h" />
+    <ClInclude Include="includes\mpir\config.h" />
+    <ClInclude Include="includes\mpir\gmp-impl.h" />
+    <ClInclude Include="includes\mpir\gmp-mparam.h" />
+    <ClInclude Include="includes\mpir\gmp.h" />
+    <ClInclude Include="includes\mpir\gmpxx.h" />
+    <ClInclude Include="includes\mpir\longlong.h" />
+    <ClInclude Include="includes\mpir\mpir.h" />
+    <ClInclude Include="includes\mpir\mpirxx.h" />
+    <ClInclude Include="prime.h" />
+    <ClInclude Include="bignum2.h" />
+    <ClInclude Include="uint256.h" />
+    <ClInclude Include="jhlib\bmp.h" />
+    <ClInclude Include="jhlib\customBuffer.h" />
+    <ClInclude Include="jhlib\fastSorter.h" />
+    <ClInclude Include="jhlib\fastString.h" />
+    <ClInclude Include="jhlib\fileMgr.h" />
+    <ClInclude Include="jhlib\fMath.h" />
+    <ClInclude Include="jhlib\hashTable.h" />
+    <ClInclude Include="jhlib\JHLib.h" />
+    <ClInclude Include="jhlib\msgQueue.h" />
+    <ClInclude Include="jhlib\packetBuffer.h" />
+    <ClInclude Include="jhlib\sData.h" />
+    <ClInclude Include="jhlib\simpleHTTP.h" />
+    <ClInclude Include="jhlib\simpleList.h" />
+    <ClInclude Include="jhlib\streamWrapper.h" />
+    <ClInclude Include="jhlib\tgaLib.h" />
+    <ClInclude Include="ripemd160.h" />
+    <ClInclude Include="sha256.h" />
+    <ClInclude Include="includes\openssl\aes.h" />
+    <ClInclude Include="includes\openssl\asn1.h" />
+    <ClInclude Include="includes\openssl\asn1_mac.h" />
+    <ClInclude Include="includes\openssl\asn1t.h" />
+    <ClInclude Include="includes\openssl\bio.h" />
+    <ClInclude Include="includes\openssl\blowfish.h" />
+    <ClInclude Include="includes\openssl\bn.h" />
+    <ClInclude Include="includes\openssl\buffer.h" />
+    <ClInclude Include="includes\openssl\camellia.h" />
+    <ClInclude Include="includes\openssl\cast.h" />
+    <ClInclude Include="includes\openssl\cmac.h" />
+    <ClInclude Include="includes\openssl\cms.h" />
+    <ClInclude Include="includes\openssl\comp.h" />
+    <ClInclude Include="includes\openssl\conf.h" />
+    <ClInclude Include="includes\openssl\conf_api.h" />
+    <ClInclude Include="includes\openssl\crypto.h" />
+    <ClInclude Include="includes\openssl\des.h" />
+    <ClInclude Include="includes\openssl\des_old.h" />
+    <ClInclude Include="includes\openssl\dh.h" />
+    <ClInclude Include="includes\openssl\dsa.h" />
+    <ClInclude Include="includes\openssl\dso.h" />
+    <ClInclude Include="includes\openssl\dtls1.h" />
+    <ClInclude Include="includes\openssl\e_os2.h" />
+    <ClInclude Include="includes\openssl\ebcdic.h" />
+    <ClInclude Include="includes\openssl\ec.h" />
+    <ClInclude Include="includes\openssl\ecdh.h" />
+    <ClInclude Include="includes\openssl\ecdsa.h" />
+    <ClInclude Include="includes\openssl\engine.h" />
+    <ClInclude Include="includes\openssl\err.h" />
+    <ClInclude Include="includes\openssl\evp.h" />
+    <ClInclude Include="includes\openssl\hmac.h" />
+    <ClInclude Include="includes\openssl\idea.h" />
+    <ClInclude Include="includes\openssl\krb5_asn.h" />
+    <ClInclude Include="includes\openssl\kssl.h" />
+    <ClInclude Include="includes\openssl\lhash.h" />
+    <ClInclude Include="includes\openssl\md4.h" />
+    <ClInclude Include="includes\openssl\md5.h" />
+    <ClInclude Include="includes\openssl\mdc2.h" />
+    <ClInclude Include="includes\openssl\modes.h" />
+    <ClInclude Include="includes\openssl\obj_mac.h" />
+    <ClInclude Include="includes\openssl\objects.h" />
+    <ClInclude Include="includes\openssl\ocsp.h" />
+    <ClInclude Include="includes\openssl\opensslconf.h" />
+    <ClInclude Include="includes\openssl\opensslv.h" />
+    <ClInclude Include="includes\openssl\ossl_typ.h" />
+    <ClInclude Include="includes\openssl\pem.h" />
+    <ClInclude Include="includes\openssl\pem2.h" />
+    <ClInclude Include="includes\openssl\pkcs12.h" />
+    <ClInclude Include="includes\openssl\pkcs7.h" />
+    <ClInclude Include="includes\openssl\pqueue.h" />
+    <ClInclude Include="includes\openssl\rand.h" />
+    <ClInclude Include="includes\openssl\rc2.h" />
+    <ClInclude Include="includes\openssl\rc4.h" />
+    <ClInclude Include="includes\openssl\ripemd.h" />
+    <ClInclude Include="includes\openssl\rsa.h" />
+    <ClInclude Include="includes\openssl\safestack.h" />
+    <ClInclude Include="includes\openssl\seed.h" />
+    <ClInclude Include="includes\openssl\sha.h" />
+    <ClInclude Include="includes\openssl\srp.h" />
+    <ClInclude Include="includes\openssl\srtp.h" />
+    <ClInclude Include="includes\openssl\ssl.h" />
+    <ClInclude Include="includes\openssl\ssl2.h" />
+    <ClInclude Include="includes\openssl\ssl23.h" />
+    <ClInclude Include="includes\openssl\ssl3.h" />
+    <ClInclude Include="includes\openssl\stack.h" />
+    <ClInclude Include="includes\openssl\symhacks.h" />
+    <ClInclude Include="includes\openssl\tls1.h" />
+    <ClInclude Include="includes\openssl\ts.h" />
+    <ClInclude Include="includes\openssl\txt_db.h" />
+    <ClInclude Include="includes\openssl\ui.h" />
+    <ClInclude Include="includes\openssl\ui_compat.h" />
+    <ClInclude Include="includes\openssl\whrlpool.h" />
+    <ClInclude Include="includes\openssl\x509.h" />
+    <ClInclude Include="includes\openssl\x509_vfy.h" />
+    <ClInclude Include="includes\openssl\x509v3.h" />
+    <ClInclude Include="jsonrpc.h" />
+    <ClInclude Include="xptClient.h" />
+    <ClInclude Include="xptServer.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cuda\mainkernel.cu">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  </ImportGroup>
+</Project>

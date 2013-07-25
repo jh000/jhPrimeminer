@@ -1,0 +1,491 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Source Files\bignum">
+      <UniqueIdentifier>{02a8f9be-4574-4021-ad60-9678867c6bcd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\jhlib">
+      <UniqueIdentifier>{7c307a83-8809-4584-b41c-f94bb5354373}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\crypto">
+      <UniqueIdentifier>{ffe23478-90cc-4eb3-8a62-92f10d8aeee0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\openssl">
+      <UniqueIdentifier>{83f7e90d-be8d-4cfe-920f-aaa8e3a65769}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\json">
+      <UniqueIdentifier>{bf3cdeff-6e78-4ffb-b613-d6ed71a85ba6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\jhbignum">
+      <UniqueIdentifier>{c3cf1c64-ee54-472e-8c9f-f902f1783e43}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+    </Filter>
+    <Filter Include="Source Files\cuda">
+      <UniqueIdentifier>{749b29fc-4ac4-4f90-9653-4c045a9f57c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\xpushthrough">
+      <UniqueIdentifier>{6e643e8d-c587-489c-9e5b-7acf45ee4029}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\mpir">
+      <UniqueIdentifier>{3475973b-54df-40f8-bd28-f6db453d5f7c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="bn2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="bn2_div.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="miner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="prime2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\bmp.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\customBuffer.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\fastSorter.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\fastString.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\fastString_eprintf.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\fileMgr.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\fMath.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\hashTable_uint32.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\msgQueue.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\packetBuffer.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\perlinNoise.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\sData.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\simpleHTTP.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\simpleList.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\streamWrapper.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="jhlib\tgaLib.cpp">
+      <Filter>Source Files\jhlib</Filter>
+    </ClCompile>
+    <ClCompile Include="ripemd160.cpp">
+      <Filter>Source Files\crypto</Filter>
+    </ClCompile>
+    <ClCompile Include="sha256.cpp">
+      <Filter>Source Files\crypto</Filter>
+    </ClCompile>
+    <ClCompile Include="includes\openssl\applink.c">
+      <Filter>Source Files\openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="jsonBuilder.cpp">
+      <Filter>Source Files\json</Filter>
+    </ClCompile>
+    <ClCompile Include="jsonClient.cpp">
+      <Filter>Source Files\json</Filter>
+    </ClCompile>
+    <ClCompile Include="jsonObject.cpp">
+      <Filter>Source Files\json</Filter>
+    </ClCompile>
+    <ClCompile Include="jsonParser.cpp">
+      <Filter>Source Files\json</Filter>
+    </ClCompile>
+    <ClCompile Include="jsonrpc.cpp">
+      <Filter>Source Files\json</Filter>
+    </ClCompile>
+    <ClCompile Include="xptClient.cpp">
+      <Filter>Source Files\xpushthrough</Filter>
+    </ClCompile>
+    <ClCompile Include="xptClientPacketHandler.cpp">
+      <Filter>Source Files\xpushthrough</Filter>
+    </ClCompile>
+    <ClCompile Include="xptPacketbuffer.cpp">
+      <Filter>Source Files\xpushthrough</Filter>
+    </ClCompile>
+    <ClCompile Include="xptServer.cpp">
+      <Filter>Source Files\xpushthrough</Filter>
+    </ClCompile>
+    <ClCompile Include="xptServerPacketHandler.cpp">
+      <Filter>Source Files\xpushthrough</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="global.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="prime.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bignum2.h">
+      <Filter>Source Files\bignum</Filter>
+    </ClInclude>
+    <ClInclude Include="uint256.h">
+      <Filter>Source Files\bignum</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\bmp.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\customBuffer.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\fastSorter.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\fastString.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\fileMgr.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\fMath.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\hashTable.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\JHLib.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\msgQueue.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\packetBuffer.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\sData.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\simpleHTTP.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\simpleList.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\streamWrapper.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="jhlib\tgaLib.h">
+      <Filter>Source Files\jhlib</Filter>
+    </ClInclude>
+    <ClInclude Include="ripemd160.h">
+      <Filter>Source Files\crypto</Filter>
+    </ClInclude>
+    <ClInclude Include="sha256.h">
+      <Filter>Source Files\crypto</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\aes.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\asn1.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\asn1_mac.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\asn1t.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\bio.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\blowfish.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\bn.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\buffer.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\camellia.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\cast.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\cmac.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\cms.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\comp.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\conf.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\conf_api.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\crypto.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\des.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\des_old.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\dh.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\dsa.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\dso.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\dtls1.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\e_os2.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ebcdic.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ec.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ecdh.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ecdsa.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\engine.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\err.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\evp.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\hmac.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\idea.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\krb5_asn.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\kssl.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\lhash.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\md4.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\md5.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\mdc2.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\modes.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\obj_mac.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\objects.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ocsp.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\opensslconf.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\opensslv.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ossl_typ.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\pem.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\pem2.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\pkcs12.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\pkcs7.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\pqueue.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\rand.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\rc2.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\rc4.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ripemd.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\rsa.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\safestack.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\seed.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\sha.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\srp.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\srtp.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ssl.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ssl2.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ssl23.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ssl3.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\stack.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\symhacks.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\tls1.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ts.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\txt_db.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ui.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\ui_compat.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\whrlpool.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\x509.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\x509_vfy.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\openssl\x509v3.h">
+      <Filter>Source Files\openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="jsonrpc.h">
+      <Filter>Source Files\json</Filter>
+    </ClInclude>
+    <ClInclude Include="xptClient.h">
+      <Filter>Source Files\xpushthrough</Filter>
+    </ClInclude>
+    <ClInclude Include="xptServer.h">
+      <Filter>Source Files\xpushthrough</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda\compile.h">
+      <Filter>Source Files\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda\cuda_string.h">
+      <Filter>Source Files\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda\digit.h">
+      <Filter>Source Files\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda\mainkernel.h">
+      <Filter>Source Files\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda\mpz.h">
+      <Filter>Source Files\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\mpir\config.h">
+      <Filter>Source Files\mpir</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\mpir\gmp.h">
+      <Filter>Source Files\mpir</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\mpir\gmp-impl.h">
+      <Filter>Source Files\mpir</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\mpir\gmp-mparam.h">
+      <Filter>Source Files\mpir</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\mpir\gmpxx.h">
+      <Filter>Source Files\mpir</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\mpir\longlong.h">
+      <Filter>Source Files\mpir</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\mpir\mpir.h">
+      <Filter>Source Files\mpir</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\mpir\mpirxx.h">
+      <Filter>Source Files\mpir</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cuda\mainkernel.cu">
+      <Filter>Source Files\cuda</Filter>
+    </None>
+  </ItemGroup>
+</Project>

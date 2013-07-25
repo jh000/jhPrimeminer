@@ -13,11 +13,11 @@
 //static const unsigned int nMaxSieveSize = 1000000u;//800000u;
 extern unsigned int nMaxSieveSize;
 static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
-static const CBigNum bnOne = 1;
-static const CBigNum bnTwo = 2;
-static const CBigNum bnConst8 = 8;
-static const CBigNum bnPrimeMax = (bnOne << 2000) - 1;
-static const CBigNum bnPrimeMin = (bnOne << 255);
+static const mpz_class bnOne = 1;
+static const mpz_class bnTwo = 2;
+static const mpz_class bnConst8 = 8;
+static const mpz_class bnPrimeMax = (bnOne << 2000) - 1;
+static const mpz_class bnPrimeMin = (bnOne << 255);
 
 extern unsigned int nTargetInitialLength;
 extern unsigned int nTargetMinLength;
@@ -30,9 +30,9 @@ bool PrimeTableGetNextPrime(unsigned int* p);
 bool PrimeTableGetPreviousPrime(unsigned int* p);
 
 // Compute primorial number p#
-void Primorial(unsigned int p, CBigNum& bnPrimorial);
+void Primorial(unsigned int p, mpz_class& bnPrimorial);
 // Compute the first primorial number greater than or equal to bn
-void PrimorialAt(CBigNum& bn, CBigNum& bnPrimorial);
+void PrimorialAt(mpz_class& bn, mpz_class& bnPrimorial);
 
 // Test probable prime chain for: bnPrimeChainOrigin
 // fFermatTest
@@ -41,7 +41,7 @@ void PrimorialAt(CBigNum& bn, CBigNum& bnPrimorial);
 // Return value:
 //   true - Probable prime chain found (one of nChainLength meeting target)
 //   false - prime chain too short (none of nChainLength meeting target)
-bool ProbablePrimeChainTest(const CBigNum& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin);
+bool ProbablePrimeChainTest(const mpz_class& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin);
 
 static const unsigned int nFractionalBits = 24;
 static const unsigned int TARGET_FRACTIONAL_MASK = (1u<<nFractionalBits) - 1;
@@ -63,7 +63,7 @@ bool TargetGetMint(unsigned int nBits, uint64& nMint);
 bool TargetGetNext(unsigned int nBits, int64 nInterval, int64 nTargetSpacing, int64 nActualSpacing, unsigned int& nBitsNext);
 
 // Mine probable prime chain of form: n = h * p# +/- 1
-//bool MineProbablePrimeChain(CBlock& block, CBigNum& bnFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit);
+//bool MineProbablePrimeChain(CBlock& block, mpz_class& bnFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit);
 
 // Check prime proof-of-work
 enum // prime chain type
@@ -72,7 +72,7 @@ enum // prime chain type
 	PRIME_CHAIN_CUNNINGHAM2 = 2u,
 	PRIME_CHAIN_BI_TWIN     = 3u,
 };
-// bool CheckPrimeProofOfWork(uint256 hashBlockHeader, unsigned int nBits, const CBigNum& bnPrimeChainMultiplier, unsigned int& nChainType, unsigned int& nChainLength);
+// bool CheckPrimeProofOfWork(uint256 hashBlockHeader, unsigned int nBits, const mpz_class& bnPrimeChainMultiplier, unsigned int& nChainType, unsigned int& nChainLength);
 
 // prime target difficulty value for visualization
 double GetPrimeDifficulty(unsigned int nBits);
@@ -81,6 +81,10 @@ unsigned int EstimateWorkTransition(unsigned int nPrevWorkTransition, unsigned i
 // prime chain type and length value
 std::string GetPrimeChainName(unsigned int nChainType, unsigned int nChainLength);
 
+inline void mpz_set_uint256(mpz_t r, uint256& u)
+{
+    mpz_import(r, 32 / sizeof(unsigned long), -1, sizeof(unsigned long), -1, 0, &u);
+}
 // Sieve of Eratosthenes for proof-of-work mining
 class CSieveOfEratosthenes
 {
@@ -113,12 +117,17 @@ public:
 	uint8* vfCompositeCunningham2;
 	uint8* vfCompositeBiTwin;
 
-	CSieveOfEratosthenes(unsigned int nSieveSize, unsigned int nBits, uint256 hashBlockHeader, CBigNum& bnFixedMultiplier)
+	CSieveOfEratosthenes(unsigned int nSieveSize, unsigned int nBits, uint256 hashBlockHeader, mpz_class& bnFixedMultiplier)
 	{
 		this->nSieveSize = nSieveSize;
 		this->nBits = nBits;
 		this->hashBlockHeader = hashBlockHeader;
-		this->bnFixedFactor = bnFixedMultiplier * CBigNum(hashBlockHeader);
+		//mpz_class mpzHashBlockHeader;
+		//mpz_set_uint256(mpzHashBlockHeader.get_mpz_t(), hashBlockHeader);
+
+		CBigNum bnFixedMultiplierTemp;
+		bnFixedMultiplierTemp.SetHex(bnFixedMultiplier.get_str(16));
+		this->bnFixedFactor = bnFixedMultiplierTemp * CBigNum(hashBlockHeader);
 		nPrimeSeq = 0;
 		uint32 maskBytes = (nMaxSieveSize+7)/8;
 		vfCompositeCunningham1 = (uint8*)malloc(sizeof(uint8)*maskBytes);
@@ -199,5 +208,7 @@ public:
 	bool WeaveFastAll();
 	// bool WeaveAlt();
 };
+
+
 
 #endif

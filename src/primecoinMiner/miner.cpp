@@ -1,6 +1,7 @@
 #include"global.h"
 
-bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* block, CBigNum& bnFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit);
+
+bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* block, mpz_class& bnFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit);
 
 void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 {
@@ -40,7 +41,7 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 	nPrimorialMultiplier = nPrimorialMultiplierStart;
 	uint32 loopCount = 0;
 
-	CBigNum bnHashFactor;
+	mpz_class bnHashFactor;
 	Primorial(nPrimorialHashFactor, bnHashFactor);
 
 	time_t unixTimeStart;
@@ -71,11 +72,16 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		//
 		bool fNewBlock = true;
 		unsigned int nTriedMultiplier = 0;
+		uint256 phash = primecoinBlock->blockHeaderHash;
+        mpz_class mpzHash;
+        mpz_set_uint256(mpzHash.get_mpz_t(), phash);
 		// Primecoin: try to find hash divisible by primorial
-		while ((primecoinBlock->blockHeaderHash < hashBlockHeaderLimit || CBigNum(primecoinBlock->blockHeaderHash) % bnHashFactor != 0) && primecoinBlock->nonce < 0xffff0000)
+		while ((phash < hashBlockHeaderLimit || (mpzHash % bnHashFactor != 0)) && primecoinBlock->nonce < 0xffff0000)
 		{
 			primecoinBlock->nonce++;
 			primecoinBlock_generateHeaderHash(primecoinBlock, primecoinBlock->blockHeaderHash.begin());
+			phash = primecoinBlock->blockHeaderHash;
+			mpz_set_uint256(mpzHash.get_mpz_t(), phash);
 		}
 		//printf("Use nonce %d\n", primecoinBlock->nonce);
 		if (primecoinBlock->nonce >= 0xffff0000)
@@ -84,7 +90,7 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 			break;
 		}
 		// Primecoin: primorial fixed multiplier
-		CBigNum bnPrimorial;
+		mpz_class bnPrimorial;
 		unsigned int nRoundTests = 0;
 		unsigned int nRoundPrimesHit = 0;
 		//int64 nPrimeTimerStart = GetTimeMicros();
@@ -115,14 +121,20 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		unsigned int nTests = 0;
 		unsigned int nPrimesHit = 0;
 		
-		CBigNum bnMultiplierMin = bnPrimeMin * bnHashFactor / CBigNum(primecoinBlock->blockHeaderHash) + 1;
+
+		mpz_class bnMultiplierMin = bnPrimeMin * bnHashFactor / mpzHash + 2;
 		while (bnPrimorial < bnMultiplierMin )
 		{
 			if (!PrimeTableGetNextPrime(&nPrimorialMultiplier))
 				error("PrimecoinMiner() : primorial minimum overflow");
 			Primorial(nPrimorialMultiplier, bnPrimorial);
 		}
-		CBigNum bnFixedMultiplier = (bnPrimorial > bnHashFactor) ? (bnPrimorial / bnHashFactor) : 1;
+		mpz_class bnFixedMultiplier;
+		if(bnPrimorial > bnHashFactor){
+			bnFixedMultiplier = bnPrimorial / bnHashFactor;
+		}else{
+			bnFixedMultiplier = 1;
+		}
 		//printf("fixedMultiplier: %d nPrimorialMultiplier: %d\n", BN_get_word(&bnFixedMultiplier), nPrimorialMultiplier);
 		// Primecoin: mine for prime chain
 		unsigned int nProbableChainLength;
