@@ -9,7 +9,7 @@
 #include"sha256.h"
 #include"ripemd160.h"
 
-#include <mpirxx.h>
+#include "mpir\mpirxx.h"
 
 #include "mpir\gmp.h"
 #include "mpir\gmpxx.h"
