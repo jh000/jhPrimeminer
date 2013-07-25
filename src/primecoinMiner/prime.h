@@ -6,6 +6,7 @@
 #define PRIMECOIN_PRIME_H
 
 //#include "main.h"
+#include "mpirxx.h"
 
 //static const unsigned int nMaxSieveSize = 1000000u;
 //static const unsigned int nMaxSieveSize = 2000000u;
@@ -18,6 +19,12 @@ static const CBigNum bnTwo = 2;
 static const CBigNum bnConst8 = 8;
 static const CBigNum bnPrimeMax = (bnOne << 2000) - 1;
 static const CBigNum bnPrimeMin = (bnOne << 255);
+static const mpz_class mpzOne = 1;
+static const mpz_class mpzTwo = 2;
+static const mpz_class mpzConst8 = 8;
+static const mpz_class mpzPrimeMax = (mpzOne << 2000) - 1;
+static const mpz_class mpzPrimeMin = (mpzOne << 255);
+
 
 extern unsigned int nTargetInitialLength;
 extern unsigned int nTargetMinLength;
@@ -30,9 +37,11 @@ bool PrimeTableGetNextPrime(unsigned int* p);
 bool PrimeTableGetPreviousPrime(unsigned int* p);
 
 // Compute primorial number p#
-void Primorial(unsigned int p, CBigNum& bnPrimorial);
+void BNPrimorial(unsigned int p, CBigNum& bnPrimorial);
+void Primorial(unsigned int p, mpz_class& mpzPrimorial);
 // Compute the first primorial number greater than or equal to bn
-void PrimorialAt(CBigNum& bn, CBigNum& bnPrimorial);
+//void PrimorialAt(CBigNum& bn, CBigNum& bnPrimorial);
+void PrimorialAt(mpz_class& bn, mpz_class& mpzPrimorial);
 
 // Test probable prime chain for: bnPrimeChainOrigin
 // fFermatTest
@@ -41,7 +50,10 @@ void PrimorialAt(CBigNum& bn, CBigNum& bnPrimorial);
 // Return value:
 //   true - Probable prime chain found (one of nChainLength meeting target)
 //   false - prime chain too short (none of nChainLength meeting target)
-bool ProbablePrimeChainTest(const CBigNum& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin);
+//bool ProbablePrimeChainTest(const CBigNum& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin);
+bool ProbablePrimeChainTest(const mpz_class& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin, bool fullTest =false);
+bool ProbablePrimeChainTestOrig(const mpz_class& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin, bool fullTest =false);
+
 
 static const unsigned int nFractionalBits = 24;
 static const unsigned int TARGET_FRACTIONAL_MASK = (1u<<nFractionalBits) - 1;
@@ -86,7 +98,8 @@ class CSieveOfEratosthenes
 {
 	unsigned int nSieveSize; // size of the sieve
 	unsigned int nBits; // target of the prime chain to search for
-	uint256 hashBlockHeader; // block header hash
+	mpz_class hashBlockHeader; // block header hash
+	mpz_class mpzFixedFactor; // fixed factor to derive the chain
 	CBigNum bnFixedFactor; // fixed factor to derive the chain
 
 	// bitmaps of the sieve, index represents the variable part of multiplier
@@ -95,7 +108,8 @@ class CSieveOfEratosthenes
 	//std::vector<bool> vfCompositeBiTwin;
 
 	CAutoBN_CTX pctx;
-	BIGNUM bn_constTwo;
+	//BIGNUM bn_constTwo;
+	mpz_t mpzTwo;
 	uint32 bignumData_constTwo[0x200/4];
 	//BIGNUM bn_nDelta1;
 	//uint32 bignumData_constTwo[0x200/4];
@@ -113,12 +127,12 @@ public:
 	uint8* vfCompositeCunningham2;
 	uint8* vfCompositeBiTwin;
 
-	CSieveOfEratosthenes(unsigned int nSieveSize, unsigned int nBits, uint256 hashBlockHeader, CBigNum& bnFixedMultiplier)
+	CSieveOfEratosthenes(unsigned int nSieveSize, unsigned int nBits, mpz_class& hashBlockHeader, mpz_class& bnFixedMultiplier)
 	{
 		this->nSieveSize = nSieveSize;
 		this->nBits = nBits;
 		this->hashBlockHeader = hashBlockHeader;
-		this->bnFixedFactor = bnFixedMultiplier * CBigNum(hashBlockHeader);
+		this->mpzFixedFactor = bnFixedMultiplier * hashBlockHeader;
 		nPrimeSeq = 0;
 		uint32 maskBytes = (nMaxSieveSize+7)/8;
 		vfCompositeCunningham1 = (uint8*)malloc(sizeof(uint8)*maskBytes);
@@ -129,12 +143,14 @@ public:
 		RtlZeroMemory(vfCompositeBiTwin, sizeof(uint8)*maskBytes);
 		nCandidateMultiplier = 0;
 		// init bn_constTwo
-		bn_constTwo.d = (BN_ULONG*)bignumData_constTwo;
-		bn_constTwo.dmax = 0x200/4;
-		bn_constTwo.flags = BN_FLG_STATIC_DATA;
-		bn_constTwo.neg = 0; 
-		bn_constTwo.top = 1; 
-		BN_set_word(&bn_constTwo, 2);
+		mpz_init_set_ui(mpzTwo, 2);
+		//bn_constTwo.d = (unsigned int*)bignumData_constTwo;
+		//bn_constTwo.dmax = 0x200/4;
+		//bn_constTwo.flags = BN_FLG_STATIC_DATA;
+		//bn_constTwo.neg = 0; 
+		//bn_constTwo.top = 1; 
+		//BN_set_word(&bn_constTwo, 2);
+
 	}
 
 
@@ -144,6 +160,7 @@ public:
 		free(vfCompositeCunningham1);
 		free(vfCompositeCunningham2);
 		free(vfCompositeBiTwin);
+		mpz_clear(mpzTwo);
 	}
 
 	// Get total number of candidates for power test
@@ -196,8 +213,16 @@ public:
 	bool WeaveOriginal();
 	//bool WeaveFast();
 	//bool WeaveFast2();
+	bool WeaveFastAllBN();
 	bool WeaveFastAll();
+
 	// bool WeaveAlt();
 };
+
+inline void mpz_set_uint256(mpz_t r, uint256& u)
+{
+    mpz_import(r, 32 / sizeof(unsigned long), -1, sizeof(unsigned long), -1, 0, &u);
+}
+
 
 #endif

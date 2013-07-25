@@ -3,6 +3,9 @@
 // see the accompanying file COPYING
 
 #include "global.h"
+#include <bitset>
+#include <time.h>
+
 
 // Prime Table
 //std::vector<unsigned int> vPrimes;
@@ -135,6 +138,22 @@ void Primorial(unsigned int p, CBigNum& bnPrimorial)
 	}
 }
 
+
+// Compute Primorial number p#
+void Primorial(unsigned int p, mpz_class& mpzPrimorial)
+{
+	mpzPrimorial = 1;
+	//BOOST_FOREACH(unsigned int nPrime, vPrimes)
+	//for(uint32 i=0; i<vPrimes.size(); i++)
+	for(uint32 i=0; i<vPrimesSize; i++)
+	{
+		unsigned int nPrime = vPrimes[i];
+		if (nPrime > p) break;
+		mpzPrimorial *= nPrime;
+	}
+}
+
+/*
 // Compute first primorial number greater than or equal to pn
 void PrimorialAt(CBigNum& bn, CBigNum& bnPrimorial)
 {
@@ -149,6 +168,23 @@ void PrimorialAt(CBigNum& bn, CBigNum& bnPrimorial)
 			return;
 	}
 }
+*/
+
+// Compute first primorial number greater than or equal to pn
+void PrimorialAt(mpz_class& bn, mpz_class& mpzPrimorial)
+{
+	mpzPrimorial = 1;
+	//BOOST_FOREACH(unsigned int nPrime, vPrimes)
+	//for(uint32 i=0; i<vPrimes.size(); i++)
+	for(uint32 i=0; i<vPrimesSize; i++)
+	{
+		unsigned int nPrime = vPrimes[i];
+		mpzPrimorial *= nPrime;
+		if (mpzPrimorial >= bn)
+			return;
+	}
+}
+
 
 // Check Fermat probable primality test (2-PRP): 2 ** (n-1) = 1 (mod n)
 // true: n is probable prime
@@ -167,6 +203,43 @@ static bool FermatProbablePrimalityTest(const CBigNum& n, unsigned int& nLength)
 		return error("FermatProbablePrimalityTest() : fractional assert");
 	nLength = (nLength & TARGET_LENGTH_MASK) | nFractionalLength;
 	return false;
+}
+
+
+// Check Fermat probable primality test (2-PRP): 2 ** (n-1) = 1 (mod n)
+// true: n is probable prime
+// false: n is composite; set fractional length in the nLength output
+static bool FermatProbablePrimalityTest(const mpz_class& n, unsigned int& nLength)
+{
+    // Faster GMP version
+    
+    mpz_t mpzN;
+    mpz_t mpzE;
+    mpz_t mpzR;
+    
+    mpz_init_set(mpzN, n.get_mpz_t());
+    mpz_init(mpzE);
+    mpz_sub_ui(mpzE, mpzN, 1);
+    mpz_init(mpzR);
+    mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, mpzN);
+    if (mpz_cmp_ui(mpzR, 1) == 0) {
+        mpz_clear(mpzN);
+        mpz_clear(mpzE);
+        mpz_clear(mpzR);
+        return true;
+    }
+    // Failed Fermat test, calculate fractional length
+    mpz_sub(mpzE, mpzN, mpzR);
+    mpz_mul_2exp(mpzR, mpzE, nFractionalBits);
+    mpz_tdiv_q(mpzE, mpzR, mpzN);
+    unsigned int nFractionalLength = mpz_get_ui(mpzE);
+    mpz_clear(mpzN);
+    mpz_clear(mpzE);
+    mpz_clear(mpzR);
+    if (nFractionalLength >= (1 << nFractionalBits))
+        return error("FermatProbablePrimalityTest() : fractional assert");
+    nLength = (nLength & TARGET_LENGTH_MASK) | nFractionalLength;
+    return false;
 }
 
 // Test probable primality of n = 2p +/- 1 based on Euler, Lagrange and Lifchitz
@@ -213,6 +286,261 @@ static bool EulerLagrangeLifchitzPrimalityTest(const CBigNum& n, bool fSophieGer
 		return error("EulerLagrangeLifchitzPrimalityTest() : fractional assert");
 	nLength = (nLength & TARGET_LENGTH_MASK) | nFractionalLength;
 	return false;
+}
+
+// Number of primes to test with fast divisibility testing
+static const unsigned int nFastDivPrimes = 60;
+
+class CPrimalityTestParams
+{
+public:
+    // GMP variables
+    mpz_t mpzE;
+    mpz_t mpzR;
+    mpz_t mpzRplusOne;
+    
+    // GMP C++ variables
+    mpz_class mpzOriginMinusOne;
+    mpz_class mpzOriginPlusOne;
+    mpz_class N;
+
+    // Big divisors for fast div test
+    std::vector<unsigned long> vFastDivisors;
+    std::vector<unsigned int> vFastDivSeq;
+    unsigned int nFastDivisorsSize;
+
+    // Values specific to a round
+    unsigned int nBits;
+    unsigned int nPrimorialSeq;
+
+    // This is currently always false when mining
+    static const bool fFermatTest = false;
+
+    // Results
+    unsigned int nChainLengthCunningham1;
+    unsigned int nChainLengthCunningham2;
+    unsigned int nChainLengthBiTwin;
+
+    CPrimalityTestParams(unsigned int nBits, unsigned int nPrimorialSeq)
+    {
+        this->nBits = nBits;
+        this->nPrimorialSeq = nPrimorialSeq;
+        nChainLengthCunningham1 = 0;
+        nChainLengthCunningham2 = 0;
+        nChainLengthBiTwin = 0;
+        mpz_init(mpzE);
+        mpz_init(mpzR);
+        mpz_init(mpzRplusOne);
+    }
+
+    ~CPrimalityTestParams()
+    {
+        mpz_clear(mpzE);
+        mpz_clear(mpzR);
+        mpz_clear(mpzRplusOne);
+    }
+};
+
+
+// Check Fermat probable primality test (2-PRP): 2 ** (n-1) = 1 (mod n)
+// true: n is probable prime
+// false: n is composite; set fractional length in the nLength output
+static bool FermatProbablePrimalityTestFast(const mpz_class& n, unsigned int& nLength, CPrimalityTestParams& testParams, bool fFastDiv = false, bool fFastFail = false)
+{
+    // Faster GMP version
+    mpz_t& mpzE = testParams.mpzE;
+    mpz_t& mpzR = testParams.mpzR;
+
+    if (fFastDiv)
+    {
+        // Fast divisibility tests
+        // Divide n by a large divisor
+        // Use the remainder to test divisibility by small primes
+        const unsigned int nDivSize = testParams.nFastDivisorsSize;
+        for (unsigned int i = 0; i < nDivSize; i++)
+        {
+            unsigned long lRemainder = mpz_tdiv_ui(n.get_mpz_t(), testParams.vFastDivisors[i]);
+            unsigned int nPrimeSeq = testParams.vFastDivSeq[i];
+            const unsigned int nPrimeSeqEnd = testParams.vFastDivSeq[i + 1];
+            for (; nPrimeSeq < nPrimeSeqEnd; nPrimeSeq++)
+            {
+                if (lRemainder % vPrimes[nPrimeSeq] == 0)
+                    return false;
+            }
+        }
+    }
+
+    mpz_sub_ui(mpzE, n.get_mpz_t(), 1);
+    mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, n.get_mpz_t());
+    if (mpz_cmp_ui(mpzR, 1) == 0)
+        return true;
+    if (fFastFail)
+        return false;
+    // Failed Fermat test, calculate fractional length
+    mpz_sub(mpzE, n.get_mpz_t(), mpzR);
+    mpz_mul_2exp(mpzR, mpzE, nFractionalBits);
+    mpz_tdiv_q(mpzE, mpzR, n.get_mpz_t());
+    unsigned int nFractionalLength = mpz_get_ui(mpzE);
+    if (nFractionalLength >= (1 << nFractionalBits))
+        return error("FermatProbablePrimalityTest() : fractional assert");
+    nLength = (nLength & TARGET_LENGTH_MASK) | nFractionalLength;
+    return false;
+}
+
+
+
+// Test probable primality of n = 2p +/- 1 based on Euler, Lagrange and Lifchitz
+// fSophieGermain:
+//   true:  n = 2p+1, p prime, aka Cunningham Chain of first kind
+//   false: n = 2p-1, p prime, aka Cunningham Chain of second kind
+// Return values
+//   true: n is probable prime
+//   false: n is composite; set fractional length in the nLength output
+static bool EulerLagrangeLifchitzPrimalityTestFast(const mpz_class& n, bool fSophieGermain, unsigned int& nLength, CPrimalityTestParams& testParams/*, bool fFastDiv = false*/)
+{
+    // Faster GMP version
+    mpz_t& mpzE = testParams.mpzE;
+    mpz_t& mpzR = testParams.mpzR;
+    mpz_t& mpzRplusOne = testParams.mpzRplusOne;
+	/*
+    if (fFastDiv)
+    {
+        // Fast divisibility tests
+        // Divide n by a large divisor
+        // Use the remainder to test divisibility by small primes
+        const unsigned int nDivSize = testParams.nFastDivisorsSize;
+        for (unsigned int i = 0; i < nDivSize; i++)
+        {
+            unsigned long lRemainder = mpz_tdiv_ui(n.get_mpz_t(), testParams.vFastDivisors[i]);
+            unsigned int nPrimeSeq = testParams.vFastDivSeq[i];
+            const unsigned int nPrimeSeqEnd = testParams.vFastDivSeq[i + 1];
+            for (; nPrimeSeq < nPrimeSeqEnd; nPrimeSeq++)
+            {
+                if (lRemainder % vPrimes[nPrimeSeq] == 0)
+                    return false;
+            }
+        }
+    }
+	*/
+    mpz_sub_ui(mpzE, n.get_mpz_t(), 1);
+    mpz_tdiv_q_2exp(mpzE, mpzE, 1);
+    mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, n.get_mpz_t());
+    unsigned int nMod8 = mpz_get_ui(n.get_mpz_t()) % 8;
+    bool fPassedTest = false;
+    if (fSophieGermain && (nMod8 == 7)) // Euler & Lagrange
+        fPassedTest = !mpz_cmp_ui(mpzR, 1);
+    else if (fSophieGermain && (nMod8 == 3)) // Lifchitz
+    {
+        mpz_add_ui(mpzRplusOne, mpzR, 1);
+        fPassedTest = !mpz_cmp(mpzRplusOne, n.get_mpz_t());
+    }
+    else if ((!fSophieGermain) && (nMod8 == 5)) // Lifchitz
+    {
+        mpz_add_ui(mpzRplusOne, mpzR, 1);
+        fPassedTest = !mpz_cmp(mpzRplusOne, n.get_mpz_t());
+    }
+    else if ((!fSophieGermain) && (nMod8 == 1)) // LifChitz
+        fPassedTest = !mpz_cmp_ui(mpzR, 1);
+    else
+        return error("EulerLagrangeLifchitzPrimalityTest() : invalid n %% 8 = %d, %s", nMod8, (fSophieGermain? "first kind" : "second kind"));
+    
+    if (fPassedTest)
+    {
+        return true;
+    }
+    
+    // Failed test, calculate fractional length
+    mpz_mul(mpzE, mpzR, mpzR);
+    mpz_tdiv_r(mpzR, mpzE, n.get_mpz_t()); // derive Fermat test remainder
+
+    mpz_sub(mpzE, n.get_mpz_t(), mpzR);
+    mpz_mul_2exp(mpzR, mpzE, nFractionalBits);
+    mpz_tdiv_q(mpzE, mpzR, n.get_mpz_t());
+    unsigned int nFractionalLength = mpz_get_ui(mpzE);
+    
+    if (nFractionalLength >= (1 << nFractionalBits))
+        return error("EulerLagrangeLifchitzPrimalityTest() : fractional assert");
+    nLength = (nLength & TARGET_LENGTH_MASK) | nFractionalLength;
+    return false;
+}
+
+
+// Test probable primality of n = 2p +/- 1 based on Euler, Lagrange and Lifchitz
+// fSophieGermain:
+//   true:  n = 2p+1, p prime, aka Cunningham Chain of first kind
+//   false: n = 2p-1, p prime, aka Cunningham Chain of second kind
+// Return values
+//   true: n is probable prime
+//   false: n is composite; set fractional length in the nLength output
+static bool EulerLagrangeLifchitzPrimalityTest(const mpz_class& n, bool fSophieGermain, unsigned int& nLength)
+{
+    // Faster GMP version
+    mpz_t mpzN;
+    mpz_t mpzE;
+    mpz_t mpzR;
+    
+    mpz_init_set(mpzN, n.get_mpz_t());
+    mpz_init(mpzE);
+    mpz_sub_ui(mpzE, mpzN, 1);
+    mpz_tdiv_q_2exp(mpzE, mpzE, 1);
+    mpz_init(mpzR);
+    mpz_powm(mpzR, mpzTwo.get_mpz_t(), mpzE, mpzN);
+    unsigned int nMod8 = mpz_tdiv_ui(mpzN, 8);
+    bool fPassedTest = false;
+    if (fSophieGermain && (nMod8 == 7)) // Euler & Lagrange
+        fPassedTest = !mpz_cmp_ui(mpzR, 1);
+    else if (fSophieGermain && (nMod8 == 3)) // Lifchitz
+    {
+        mpz_t mpzRplusOne;
+        mpz_init(mpzRplusOne);
+        mpz_add_ui(mpzRplusOne, mpzR, 1);
+        fPassedTest = !mpz_cmp(mpzRplusOne, mpzN);
+        mpz_clear(mpzRplusOne);
+    }
+    else if ((!fSophieGermain) && (nMod8 == 5)) // Lifchitz
+    {
+        mpz_t mpzRplusOne;
+        mpz_init(mpzRplusOne);
+        mpz_add_ui(mpzRplusOne, mpzR, 1);
+        fPassedTest = !mpz_cmp(mpzRplusOne, mpzN);
+        mpz_clear(mpzRplusOne);
+    }
+    else if ((!fSophieGermain) && (nMod8 == 1)) // LifChitz
+    {
+        fPassedTest = !mpz_cmp_ui(mpzR, 1);
+    }
+    else
+    {
+        mpz_clear(mpzN);
+        mpz_clear(mpzE);
+        mpz_clear(mpzR);
+        return error("EulerLagrangeLifchitzPrimalityTest() : invalid n %% 8 = %d, %s", nMod8, (fSophieGermain? "first kind" : "second kind"));
+    }
+    
+    if (fPassedTest) {
+        mpz_clear(mpzN);
+        mpz_clear(mpzE);
+        mpz_clear(mpzR);
+        return true;
+    }
+    
+    // Failed test, calculate fractional length
+    mpz_mul(mpzE, mpzR, mpzR);
+    mpz_tdiv_r(mpzR, mpzE, mpzN); // derive Fermat test remainder
+
+    mpz_sub(mpzE, mpzN, mpzR);
+    mpz_mul_2exp(mpzR, mpzE, nFractionalBits);
+    mpz_tdiv_q(mpzE, mpzR, mpzN);
+    unsigned int nFractionalLength = mpz_get_ui(mpzE);
+    mpz_clear(mpzN);
+    mpz_clear(mpzE);
+    mpz_clear(mpzR);
+    
+    if (nFractionalLength >= (1 << nFractionalBits)) {
+        return error("EulerLagrangeLifchitzPrimalityTest() : fractional assert");
+    }
+    nLength = (nLength & TARGET_LENGTH_MASK) | nFractionalLength;
+    return false;
 }
 
 // Proof-of-work Target (prime chain target):
@@ -348,6 +676,8 @@ bool TargetGetNext(unsigned int nBits, int64 nInterval, int64 nTargetSpacing, in
 	return true;
 }
 
+
+
 // Test Probable Cunningham Chain for: n
 // fSophieGermain:
 //   true - Test for Cunningham Chain of first kind (n, 2n+1, 4n+3, ...)
@@ -355,7 +685,74 @@ bool TargetGetNext(unsigned int nBits, int64 nInterval, int64 nTargetSpacing, in
 // Return value:
 //   true - Probable Cunningham Chain found (length at least 2)
 //   false - Not Cunningham Chain
-static bool ProbableCunninghamChainTest(const CBigNum& n, bool fSophieGermain, bool fFermatTest, unsigned int& nProbableChainLength)
+static bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGermain, bool fFermatTest, unsigned int& nProbableChainLength, CPrimalityTestParams& testParams)
+{
+    nProbableChainLength = 0;
+
+    // Fermat test for n first
+    if (!FermatProbablePrimalityTestFast(n, nProbableChainLength, testParams, true, true))
+        return false;
+
+    // Euler-Lagrange-Lifchitz test for the following numbers in chain
+    mpz_class &N = testParams.N;
+    N = n;
+    while (true)
+    {
+        TargetIncrementLength(nProbableChainLength);
+        N <<= 1;
+        N += (fSophieGermain? 1 : (-1));
+        if (fFermatTest)
+        {
+            if (!FermatProbablePrimalityTestFast(N, nProbableChainLength, testParams))
+                break;
+        }
+        else
+        {
+            if (!EulerLagrangeLifchitzPrimalityTestFast(N, fSophieGermain, nProbableChainLength, testParams))
+                break;
+        }
+    }
+
+    return (TargetGetLength(nProbableChainLength) >= 2);
+}
+
+// Test Probable Cunningham Chain for: n
+// fSophieGermain:
+//   true - Test for Cunningham Chain of first kind (n, 2n+1, 4n+3, ...)
+//   false - Test for Cunningham Chain of second kind (n, 2n-1, 4n-3, ...)
+// Return value:
+//   true - Probable Cunningham Chain found (length at least 2)
+//   false - Not Cunningham Chain
+static bool ProbableCunninghamChainTest(const mpz_class& n, bool fSophieGermain, bool fFermatTest, unsigned int& nProbableChainLength)
+{
+    nProbableChainLength = 0;
+    mpz_class N = n;
+
+    // Fermat test for n first
+    if (!FermatProbablePrimalityTest(N, nProbableChainLength))
+        return false;
+
+    // Euler-Lagrange-Lifchitz test for the following numbers in chain
+    while (true)
+    {
+        TargetIncrementLength(nProbableChainLength);
+        N = N + N + (fSophieGermain? 1 : (-1));
+        if (fFermatTest)
+        {
+            if (!FermatProbablePrimalityTest(N, nProbableChainLength))
+                break;
+        }
+        else
+        {
+            if (!EulerLagrangeLifchitzPrimalityTest(N, fSophieGermain, nProbableChainLength))
+                break;
+        }
+    }
+
+    return (TargetGetLength(nProbableChainLength) >= 2);
+}
+
+static bool ProbableCunninghamChainTestBN(const CBigNum& n, bool fSophieGermain, bool fFermatTest, unsigned int& nProbableChainLength)
 {
 	nProbableChainLength = 0;
 	CBigNum N = n;
@@ -388,15 +785,106 @@ static bool ProbableCunninghamChainTest(const CBigNum& n, bool fSophieGermain, b
 // Return value:
 //   true - Probable prime chain found (one of nChainLength meeting target)
 //   false - prime chain too short (none of nChainLength meeting target)
-bool ProbablePrimeChainTest(const CBigNum& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin)
+bool ProbablePrimeChainTest(const mpz_class& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin, bool fullTest)
 {
 	nChainLengthCunningham1 = 0;
 	nChainLengthCunningham2 = 0;
 	nChainLengthBiTwin = 0;
-	// Test for Cunningham Chain of first kind
-	ProbableCunninghamChainTest(bnPrimeChainOrigin-1, true, fFermatTest, nChainLengthCunningham1);
+
 	// Test for Cunningham Chain of second kind
 	ProbableCunninghamChainTest(bnPrimeChainOrigin+1, false, fFermatTest, nChainLengthCunningham2);
+	if (nChainLengthCunningham2 >= nBits && !fullTest)
+		return true;
+	// Test for Cunningham Chain of first kind
+	ProbableCunninghamChainTest(bnPrimeChainOrigin-1, true, fFermatTest, nChainLengthCunningham1);
+	if (nChainLengthCunningham1 >= nBits && !fullTest)
+		return true;
+	// Figure out BiTwin Chain length
+	// BiTwin Chain allows a single prime at the end for odd length chain
+	nChainLengthBiTwin =
+		(TargetGetLength(nChainLengthCunningham1) > TargetGetLength(nChainLengthCunningham2))?
+		(nChainLengthCunningham2 + TargetFromInt(TargetGetLength(nChainLengthCunningham2)+1)) :
+	(nChainLengthCunningham1 + TargetFromInt(TargetGetLength(nChainLengthCunningham1)));
+	if (fullTest)
+		return (nChainLengthCunningham1 >= nBits || nChainLengthCunningham2 >= nBits || nChainLengthBiTwin >= nBits);
+	else
+		return nChainLengthBiTwin >= nBits;
+}
+
+
+// Test probable prime chain for: nOrigin
+// Return value:
+//   true - Probable prime chain found (one of nChainLength meeting target)
+//   false - prime chain too short (none of nChainLength meeting target)
+static bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPrimalityTestParams& testParams)
+{
+    const unsigned int nBits = testParams.nBits;
+    unsigned int& nChainLengthCunningham1 = testParams.nChainLengthCunningham1;
+    unsigned int& nChainLengthCunningham2 = testParams.nChainLengthCunningham2;
+    unsigned int& nChainLengthBiTwin = testParams.nChainLengthBiTwin;
+    const bool fFermatTest = testParams.fFermatTest;
+    mpz_class& mpzOriginMinusOne = testParams.mpzOriginMinusOne;
+    mpz_class& mpzOriginPlusOne = testParams.mpzOriginPlusOne;
+    nChainLengthCunningham1 = 0;
+    nChainLengthCunningham2 = 0;
+    nChainLengthBiTwin = 0;
+
+    // Test for Cunningham Chain of first kind
+    mpzOriginMinusOne = mpzPrimeChainOrigin - 1;
+    ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, fFermatTest, nChainLengthCunningham1, testParams);
+    // Test for Cunningham Chain of second kind
+    mpzOriginPlusOne = mpzPrimeChainOrigin + 1;
+    ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, fFermatTest, nChainLengthCunningham2, testParams);
+    // Figure out BiTwin Chain length
+    // BiTwin Chain allows a single prime at the end for odd length chain
+    nChainLengthBiTwin =
+        (TargetGetLength(nChainLengthCunningham1) > TargetGetLength(nChainLengthCunningham2))?
+            (nChainLengthCunningham2 + TargetFromInt(TargetGetLength(nChainLengthCunningham2)+1)) :
+            (nChainLengthCunningham1 + TargetFromInt(TargetGetLength(nChainLengthCunningham1)));
+
+    return (nChainLengthCunningham1 >= nBits || nChainLengthCunningham2 >= nBits || nChainLengthBiTwin >= nBits);
+}
+
+
+bool ProbablePrimeChainTestOrig(const mpz_class& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin, bool fullTest)
+{
+nChainLengthCunningham1 = 0;
+    nChainLengthCunningham2 = 0;
+    nChainLengthBiTwin = 0;
+
+    // Test for Cunningham Chain of first kind
+    ProbableCunninghamChainTest(bnPrimeChainOrigin-1, true, fFermatTest, nChainLengthCunningham1);
+    // Test for Cunningham Chain of second kind
+    ProbableCunninghamChainTest(bnPrimeChainOrigin+1, false, fFermatTest, nChainLengthCunningham2);
+    // Figure out BiTwin Chain length
+    // BiTwin Chain allows a single prime at the end for odd length chain
+    nChainLengthBiTwin =
+        (TargetGetLength(nChainLengthCunningham1) > TargetGetLength(nChainLengthCunningham2))?
+            (nChainLengthCunningham2 + TargetFromInt(TargetGetLength(nChainLengthCunningham2)+1)) :
+            (nChainLengthCunningham1 + TargetFromInt(TargetGetLength(nChainLengthCunningham1)));
+	if (nChainLengthCunningham1 >= nBits && nChainLengthCunningham1 >= nChainLengthCunningham2 && nChainLengthCunningham1 >= nChainLengthBiTwin)
+		primeStats.cunningham1Count++;
+	if (nChainLengthCunningham2 >= nBits && nChainLengthCunningham2 >= nChainLengthCunningham1 && nChainLengthCunningham2 >= nChainLengthBiTwin)
+		primeStats.cunningham2Count++;
+	if (nChainLengthBiTwin >= nBits && nChainLengthBiTwin >= nChainLengthCunningham1 && nChainLengthBiTwin >= nChainLengthCunningham2)
+		primeStats.cunninghamBiTwinCount++;
+	
+    return (nChainLengthCunningham1 >= nBits || nChainLengthCunningham2 >= nBits || nChainLengthBiTwin >= nBits);}
+
+
+
+bool ProbablePrimeChainTestBN(const CBigNum& bnPrimeChainOrigin, unsigned int nBits, bool fFermatTest, unsigned int& nChainLengthCunningham1, unsigned int& nChainLengthCunningham2, unsigned int& nChainLengthBiTwin)
+{
+	nChainLengthCunningham1 = 0;
+	nChainLengthCunningham2 = 0;
+	nChainLengthBiTwin = 0;
+
+	// Test for Cunningham Chain of first kind
+	ProbableCunninghamChainTestBN(bnPrimeChainOrigin-1, true, fFermatTest, nChainLengthCunningham1);
+	if (nChainLengthCunningham1 >= nBits)
+		return true;
+	// Test for Cunningham Chain of second kind
+	ProbableCunninghamChainTestBN(bnPrimeChainOrigin+1, false, fFermatTest, nChainLengthCunningham2);
 	// Figure out BiTwin Chain length
 	// BiTwin Chain allows a single prime at the end for odd length chain
 	nChainLengthBiTwin =
@@ -410,8 +898,10 @@ bool ProbablePrimeChainTest(const CBigNum& bnPrimeChainOrigin, unsigned int nBit
 //boost::thread_specific_ptr<CSieveOfEratosthenes> psieve;
 
 // Mine probable prime chain of form: n = h * p# +/- 1
-bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* block, CBigNum& bnFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, unsigned int& nTests, unsigned int& nPrimesHit)
+bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength, 
+							unsigned int& nTests, unsigned int& nPrimesHit, sint32 threadIndex, mpz_class& mpzHash, unsigned int nPrimorialMultiplier)
 {
+
 	nProbableChainLength = 0;
 	nTests = 0;
 	nPrimesHit = 0;
@@ -427,44 +917,68 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 	if (*psieve == NULL)
 	{
 		// Build sieve
-		uint32 nStart = GetTickCount();
+		//uint32 nStart = GetTickCount();
 		//uint32 sieveStopTimeLimit = nStart + 2000;
 		//for(uint32 i=0; i<256/8; i++)
 		//	printf("%02x", block->blockHeaderHash.begin()[i]);
-		*psieve = new CSieveOfEratosthenes(nMaxSieveSize, block->nBits, block->blockHeaderHash, bnFixedMultiplier);
+		*psieve = new CSieveOfEratosthenes(nMaxSieveSize, block->nBits, mpzHash, mpzFixedMultiplier);
 		(*psieve)->WeaveFastAll();
-		
-
-		uint32 maskBytes = (nMaxSieveSize+7)/8;
-
-		//CSieveOfEratosthenes* sieve2 = new CSieveOfEratosthenes(nMaxSieveSize, block->nBits, block->blockHeaderHash, bnFixedMultiplier);
-		//while (sieve2->WeaveOriginal() );
-		//	
-		//for(uint32 i=0; i<maskBytes; i++)
-		//{
-		//	if( (*psieve)->vfCompositeBiTwin[i] != sieve2->vfCompositeBiTwin[i] )
-		//		__debugbreak();
-		//	if( (*psieve)->vfCompositeCunningham1[i] != sieve2->vfCompositeCunningham1[i] )
-		//		__debugbreak();
-		//	if( (*psieve)->vfCompositeCunningham2[i] != sieve2->vfCompositeCunningham2[i] )
-		//		__debugbreak();
-
-		//}
-		//printf("Sieve test complete\n");
-		
-		// printf("MineProbablePrimeChain() : new sieve (%u/%u) ready in %ums multiplier: %u\n", (*psieve)->GetCandidateCount(), nMaxSieveSize, (unsigned int) (GetTickCount() - nStart), bnFixedMultiplier);
 	}
 
-	CBigNum bnChainOrigin;
+	mpz_class mpzHashMultiplier = mpzHash * mpzFixedMultiplier;
+	mpz_class mpzChainOrigin;
+
+    // Determine the sequence number of the round primorial
+    unsigned int nPrimorialSeq = 0;
+    while (vPrimes[nPrimorialSeq + 1] <= nPrimorialMultiplier)
+        nPrimorialSeq++;
+
+    // Allocate GMP variables for primality tests
+    CPrimalityTestParams testParams(block->serverData.nBitsForShare, nPrimorialSeq);
+    // Compute parameters for fast div test
+    {
+        unsigned long lDivisor = 1;
+        unsigned int i;
+        testParams.vFastDivSeq.push_back(nPrimorialSeq);
+        for (i = 1; i <= nFastDivPrimes; i++)
+        {
+            // Multiply primes together until the result won't fit an unsigned long
+            if (lDivisor < ULONG_MAX / vPrimes[nPrimorialSeq + i])
+                lDivisor *= vPrimes[nPrimorialSeq + i];
+            else
+            {
+                testParams.vFastDivisors.push_back(lDivisor);
+                testParams.vFastDivSeq.push_back(nPrimorialSeq + i);
+                lDivisor = 1;
+            }
+        }
+
+        // Finish off by multiplying as many primes as possible
+        while (lDivisor < ULONG_MAX / vPrimes[nPrimorialSeq + i])
+        {
+            lDivisor *= vPrimes[nPrimorialSeq + i];
+            i++;
+        }
+        testParams.vFastDivisors.push_back(lDivisor);
+        testParams.vFastDivSeq.push_back(nPrimorialSeq + i);
+        testParams.nFastDivisorsSize = testParams.vFastDivisors.size();
+    }
+
+	 // References to counters;
+    unsigned int& nChainLengthCunningham1 = testParams.nChainLengthCunningham1;
+    unsigned int& nChainLengthCunningham2 = testParams.nChainLengthCunningham2;
+    unsigned int& nChainLengthBiTwin = testParams.nChainLengthBiTwin;
 
 	//nStart = GetTickCount();
 	//nCurrent = nStart;
 
 	//uint32 timeStop = GetTickCount() + 25000;
-	uint32 nTries = 0;
-	while ( nTries < 15000 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex) )
+	//int nTries = 0;
+	//bool multipleShare = false;
+	
+	while ( nTests < 1500 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex))
 	{
-		nTries++;
+		//nTries++;
 		nTests++;
 		if (!(*psieve)->GetNextCandidateMultiplier(nTriedMultiplier))
 		{
@@ -474,14 +988,23 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 			fNewBlock = true; // notify caller to change nonce
 			return false;
 		}
-		bnChainOrigin = CBigNum(block->blockHeaderHash) * bnFixedMultiplier * nTriedMultiplier;
-		unsigned int nChainLengthCunningham1 = 0;
-		unsigned int nChainLengthCunningham2 = 0;
-		unsigned int nChainLengthBiTwin = 0;
-		bool canSubmitAsShare = ProbablePrimeChainTest(bnChainOrigin, block->nBits, false, nChainLengthCunningham1, nChainLengthCunningham2, nChainLengthBiTwin);
+				
+		mpzChainOrigin = mpzHash * mpzFixedMultiplier * nTriedMultiplier;		
+		nChainLengthCunningham1 = 0;
+		nChainLengthCunningham2 = 0;
+		nChainLengthBiTwin = 0;
+
+		
+		bool canSubmitAsShare = ProbablePrimeChainTestFast(mpzChainOrigin, testParams);
+		//CBigNum bnChainOrigin;
+		//bnChainOrigin.SetHex(mpzChainOrigin.get_str(16));
+		//bool canSubmitAsShare = ProbablePrimeChainTestBN(bnChainOrigin, block->serverData.nBitsForShare, false, nChainLengthCunningham1, nChainLengthCunningham2, nChainLengthBiTwin);
+		
 		nProbableChainLength = max(max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
-		if( nProbableChainLength >= block->serverData.nBitsForShare )
-			canSubmitAsShare = true;
+
+		
+		if (nProbableChainLength >= 0x5000000)
+			primeStats.fiveChainCount ++;
 		//if( nBitsGen >= 0x03000000 )
 		//	printf("%08X\n", nBitsGen);
 		primeStats.primeChainsFound++;
@@ -489,9 +1012,12 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 		//	primeStats.qualityPrimesFound++;
 		if( nProbableChainLength > primeStats.bestPrimeChainDifficulty )
 			primeStats.bestPrimeChainDifficulty = nProbableChainLength;
-		if(canSubmitAsShare)
+		
+		if(nProbableChainLength >= block->serverData.nBitsForShare)
 		{
-			block->bnPrimeChainMultiplier = bnFixedMultiplier * nTriedMultiplier;
+			//primeStats.shareFound = true;
+			
+			block->mpzPrimeChainMultiplier = mpzFixedMultiplier * nTriedMultiplier;
 			// update server data
 			block->serverData.client_shareBits = nProbableChainLength;
 			// generate block raw data
@@ -499,7 +1025,9 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 			memcpy(blockRawData, block, 80);
 			uint32 writeIndex = 80;
 			sint32 lengthBN = 0;
-			std::vector<unsigned char> bnSerializeData = block->bnPrimeChainMultiplier.getvch();
+			CBigNum bnPrimeChainMultiplier;
+			bnPrimeChainMultiplier.SetHex(block->mpzPrimeChainMultiplier.get_str(16));
+			std::vector<unsigned char> bnSerializeData = bnPrimeChainMultiplier.getvch();
 			lengthBN = bnSerializeData.size();
 			*(uint8*)(blockRawData+writeIndex) = (uint8)lengthBN; // varInt (we assume it always has a size low enough for 1 byte)
 			writeIndex += 1;
@@ -510,8 +1038,11 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 			{
 				*(uint32*)(blockRawData+f*4) = _swapEndianessU32(*(uint32*)(blockRawData+f*4));
 			}
+			printf("***!!!!! Share found (@ %u - Th#: %u) -----  DIFF: %f\n", nTests, threadIndex, (float)((double)nProbableChainLength  / (double)0x1000000));
+
 			// submit this share
-			jhMiner_pushShare_primecoin(blockRawData, block);
+			if (jhMiner_pushShare_primecoin(blockRawData, block))
+				primeStats.foundShareCount ++;
 			//printf("Probable prime chain found for block=%s!!\n  Target: %s\n  Length: (%s %s %s)\n", block.GetHash().GetHex().c_str(),TargetToString(block.nBits).c_str(), TargetToString(nChainLengthCunningham1).c_str(), TargetToString(nChainLengthCunningham2).c_str(), TargetToString(nChainLengthBiTwin).c_str());
 			//nProbableChainLength = max(max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
 			// since we are using C structs here we have to make sure the memory for the CBigNum in the block is freed again
@@ -522,7 +1053,11 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 			//delete *psieve;
 			//*psieve = NULL;
 			// dont quit if we find a share, there could be other shares in the remaining prime candidates
-			//return false;
+			nTests = 0;   // tehere is a good chance to find more shares so search a litle more.
+			//block->nonce++;
+			//return true;
+			//break;
+			//if (multipleShare)
 		}
 		//if(TargetGetLength(nProbableChainLength) >= 1)
 		//	nPrimesHit++;
@@ -533,6 +1068,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 		delete *psieve;
 		*psieve = NULL;
 	}
+
 	return false; // stop as timed out
 }
 
@@ -979,7 +1515,7 @@ int single_modinv (int a, int modulus)
 // Return values:
 //   True  - weaved another prime; nComposite - number of composites removed
 //   False - sieve already completed
-bool CSieveOfEratosthenes::WeaveFastAll()
+bool CSieveOfEratosthenes::WeaveFastAllBN()
 {
 	//CBigNum p = vPrimes[nPrimeSeq];
 	// init some required bignums on the stack (no dynamic allocation at all)
@@ -1089,5 +1625,123 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 
 		nPrimeSeq++;
 	}
+	return false; // never reached
+}
+
+// Weave sieve for the next prime in table
+// Return values:
+//   True  - weaved another prime; nComposite - number of composites removed
+//   False - sieve already completed
+bool CSieveOfEratosthenes::WeaveFastAll()
+{
+
+	  // Faster GMP version
+    const unsigned int nChainLength = TargetGetLength(nBits);
+    unsigned int nPrimeSeq = 0;
+    unsigned int vPrimesSize2 = vPrimesSize;
+
+    // Keep all variables local for max performance
+    unsigned int nSieveSize = this->nSieveSize;
+
+    // Process only 10% of the primes
+    // Most composites are still found
+    vPrimesSize2 = (uint64)vPrimesSize2 *8 / 100;
+
+	
+    mpz_t mpzFixedFactor; // fixed factor to derive the chain
+    mpz_t mpzFixedFactorMod;
+    mpz_t p;
+    mpz_t mpzFixedInverse;
+    //mpz_t mpzTwo;
+    mpz_t mpzTwoInverse;
+
+
+	unsigned long nFixedFactorMod;
+    unsigned long nFixedInverse;
+    unsigned long nTwoInverse;
+
+	mpz_init_set(mpzFixedFactor, this->mpzFixedFactor.get_mpz_t());
+    mpz_init(mpzFixedFactorMod);
+    mpz_init(p);
+    mpz_init(mpzFixedInverse);
+    //mpz_init_set_ui(mpzTwo, 2);
+    mpz_init(mpzTwoInverse);
+	
+	while( true )
+	{
+		unsigned int nPrime = vPrimes[nPrimeSeq];
+		if (nPrimeSeq >= vPrimesSize2 || nPrime >= nSieveSize)
+		{
+			break;
+			//return false;  // sieve has been completed
+
+		}
+		//BN_set_word(&bn_p, nPrime);
+        //mpz_set_ui(p, nPrime);
+
+		//BN_mod(&bn_tmp, &bnFixedFactor, &bn_p, pctx);
+        nFixedFactorMod = mpz_tdiv_r_ui(mpzFixedFactorMod, mpzFixedFactor, nPrime);
+        
+        if (nFixedFactorMod == 0)
+        {
+            // Nothing in the sieve is divisible by this prime
+            nPrimeSeq++;
+            continue;
+        }
+        mpz_set_ui(p, nPrime);
+
+		// Find the modulo inverse of fixed factor
+        if (!mpz_invert(mpzFixedInverse, mpzFixedFactorMod, p))
+            return error("CSieveOfEratosthenes::Weave(): mpz_invert of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
+        //nFixedInverse = mpz_get_ui(mpzFixedInverse);
+        if (!mpz_invert(mpzTwoInverse, mpzTwo, p))
+            return error("CSieveOfEratosthenes::Weave(): mpz_invert of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
+        //nTwoInverse = mpz_get_ui(mpzTwoInverse);
+		
+		uint64 pU64 = (uint64)vPrimes[nPrimeSeq];
+		//uint64 fixedInverseU64 = BN_get_word(&bn_fixedInverse);
+		uint64 fixedInverseU64 = mpz_get_ui(mpzFixedInverse);
+		//uint64 twoInverseU64 = BN_get_word(&bn_twoInverse);
+		uint64 twoInverseU64 = mpz_get_ui(mpzTwoInverse);
+		// Weave the sieve for the prime		
+		for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
+		{
+
+			uint64 nSolvedMultiplier;
+
+			if( (nBiTwinSeq&1) == 0 )
+				nSolvedMultiplier = ((fixedInverseU64) * (pU64 + 1ULL)) % pU64;
+			else
+				nSolvedMultiplier = ((fixedInverseU64) * (pU64 - 1ULL)) % pU64;
+
+			//if( nSolvedMultiplier != nSolvedMultiplier2 )
+			//	__debugbreak();
+
+			if (nBiTwinSeq % 2 == 1)
+			{
+				fixedInverseU64 = (fixedInverseU64*twoInverseU64)%pU64;
+			}
+			unsigned int nPrime = vPrimes[nPrimeSeq];
+			if (nBiTwinSeq < nChainLength)
+				for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
+					vfCompositeBiTwin[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
+			if (((nBiTwinSeq & 1u) == 0))
+				for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
+					vfCompositeCunningham1[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
+			if (((nBiTwinSeq & 1u) == 1u))
+				for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
+					vfCompositeCunningham2[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
+		}
+		nPrimeSeq++;
+	}
+	this->nPrimeSeq = nPrimeSeq;
+
+	mpz_clear(mpzFixedFactor);
+    mpz_clear(mpzFixedFactorMod);
+    mpz_clear(p);
+    mpz_clear(mpzFixedInverse);
+    //mpz_clear(mpzTwo);
+    mpz_clear(mpzTwoInverse);
+
 	return false; // never reached
 }

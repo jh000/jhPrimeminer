@@ -16,6 +16,74 @@ bool error(const char *format, ...)
 	return false;
 }
 
+/*
+bool hex2bin(unsigned char *p, const char *hexstr, size_t len)
+{
+	while (*hexstr && len) {
+		char hex_byte[3];
+		unsigned int v;
+
+		if (!hexstr[1]) {
+			printf("hex2bin str truncated");
+			return false;
+		}
+
+		hex_byte[0] = hexstr[0];
+		hex_byte[1] = hexstr[1];
+		hex_byte[2] = 0;
+
+		if (sscanf(hex_byte, "%x", &v) != 1) {
+			printf("hex2bin sscanf '%s' failed", hex_byte);
+			return false;
+		}
+
+		*p = (unsigned char) v;
+
+		p++;
+		hexstr += 2;
+		len--;
+	}
+
+	return (len == 0 && *hexstr == 0) ? true : false;
+}
+*/
+
+bool hex2bin(unsigned char *p, const char *hexstr, size_t len)
+{
+	bool ret = false;
+
+	while (*hexstr && len) {
+		char hex_byte[4];
+		unsigned int v;
+
+		if (!hexstr[1]) {
+			printf("hex2bin str truncated");
+			return ret;
+		}
+
+		memset(hex_byte, 0, 4);
+		hex_byte[0] = hexstr[0];
+		hex_byte[1] = hexstr[1];
+
+		if (sscanf(hex_byte, "%x", &v) != 1) {
+			printf( "hex2bin sscanf '%s' failed", hex_byte);
+			return ret;
+		}
+
+		*p = (unsigned char) v;
+
+		p++;
+		hexstr += 2;
+		len--;
+	}
+
+	if (len == 0 && *hexstr == 0)
+		ret = true;
+	return ret;
+}
+
+
+
 uint32 _swapEndianessU32(uint32 v)
 {
 	return ((v>>24)&0xFF)|((v>>8)&0xFF00)|((v<<8)&0xFF0000)|((v<<24)&0xFF000000);
@@ -88,7 +156,9 @@ void primecoinBlock_generateBlockHash(primecoinBlock_t* primecoinBlock, uint8 ha
 	memcpy(blockHashDataInput, primecoinBlock, 80);
 	uint32 writeIndex = 80;
 	sint32 lengthBN = 0;
-	std::vector<unsigned char> bnSerializeData = primecoinBlock->bnPrimeChainMultiplier.getvch();
+	CBigNum bnPrimeChainMultiplier;
+	bnPrimeChainMultiplier.SetHex(primecoinBlock->mpzPrimeChainMultiplier.get_str(16));
+	std::vector<unsigned char> bnSerializeData = bnPrimeChainMultiplier.getvch();
 	lengthBN = bnSerializeData.size();
 	*(uint8*)(blockHashDataInput+writeIndex) = (uint8)lengthBN;
 	writeIndex += 1;
@@ -128,6 +198,8 @@ typedef struct
 workData_t workData;
 
 jsonRequestTarget_t jsonRequestTarget; // rpc login data
+jsonRequestTarget_t jsonLocalPrimeCoin; // rpc login data
+bool useLocalPrimecoindForLongpoll;
 
 
 /*
@@ -195,7 +267,9 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 		xptShareToSubmit->nonce = primecoinBlock->nonce;
 		xptShareToSubmit->nTime = primecoinBlock->timestamp;
 		// set multiplier
-		std::vector<unsigned char> bnSerializeData = primecoinBlock->bnPrimeChainMultiplier.getvch();
+		CBigNum bnPrimeChainMultiplier;
+		bnPrimeChainMultiplier.SetHex(primecoinBlock->mpzPrimeChainMultiplier.get_str(16));
+		std::vector<unsigned char> bnSerializeData = bnPrimeChainMultiplier.getvch();
 		sint32 lengthBN = bnSerializeData.size();
 		memcpy(xptShareToSubmit->chainMultiplier, &bnSerializeData[0], lengthBN);
 		xptShareToSubmit->chainMultiplierSize = lengthBN;
@@ -205,6 +279,64 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 	}
 }
 
+int queryLocalPrimecoindBlockCount(bool useLocal)
+{
+	sint32 rpcErrorCode = 0;
+	jsonObject_t* jsonReturnValue = jsonClient_request(useLocal ? &jsonLocalPrimeCoin : &jsonRequestTarget, "getblockcount", NULL, &rpcErrorCode);
+	if( jsonReturnValue == NULL )
+	{
+		printf("getblockcount() failed with %serror code %d\n", (rpcErrorCode>1000)?"http ":"", rpcErrorCode>1000?rpcErrorCode-1000:rpcErrorCode);
+		return 0;
+	}
+	else
+	{
+		jsonObject_t* jsonResult = jsonObject_getParameter(jsonReturnValue, "result");
+		return (int) jsonObject_getNumberValueAsS32(jsonResult);
+		jsonObject_freeObject(jsonReturnValue);
+	}
+
+	return 0;
+}
+
+static double DIFFEXACTONE = 26959946667150639794667015087019630673637144422540572481103610249215.0;
+static const uint64_t diffone = 0xFFFF000000000000ull;
+
+static double target_diff(const unsigned char *target)
+{
+	double targ = 0;
+	signed int i;
+
+	for (i = 31; i >= 0; --i)
+		targ = (targ * 0x100) + target[i];
+
+	return DIFFEXACTONE / (targ ? targ: 1);
+}
+
+
+//static double DIFFEXACTONE = 26959946667150639794667015087019630673637144422540572481103610249215.0;
+//static const uint64_t diffone = 0xFFFF000000000000ull;
+
+double target_diff(const uint32_t  *target)
+{
+	double targ = 0;
+	signed int i;
+
+	for (i = 0; i < 8; i++)
+		targ = (targ * 0x100) + target[7 - i];
+
+	return DIFFEXACTONE / ((double)targ ?  targ : 1);
+}
+
+
+std::string HexBits(unsigned int nBits)
+{
+    union {
+        int32_t nBits;
+        char cBits[4];
+    } uBits;
+    uBits.nBits = htonl((int32_t)nBits);
+    return HexStr(BEGIN(uBits.cBits), END(uBits.cBits));
+}
 void jhMiner_queryWork_primecoin()
 {
 	sint32 rpcErrorCode = 0;
@@ -304,7 +436,7 @@ int jhMiner_workerThread_getwork(int threadIndex)
 		memcpy(&primecoinBlock.serverData, serverData, 32);
 		// start mining
 		BitcoinMiner(&primecoinBlock, threadIndex);
-		primecoinBlock.bnPrimeChainMultiplier = 0;
+		primecoinBlock.mpzPrimeChainMultiplier = 0;
 	}
 	return 0;
 }
@@ -320,7 +452,7 @@ int jhMiner_workerThread_xpt(int threadIndex)
 		// copy block data from global workData
 		uint32 workDataHash = 0;
 		uint8 serverData[32];
-		while( workData.workEntry[threadIndex].dataIsValid == false ) Sleep(200);
+		while( workData.workEntry[threadIndex].dataIsValid == false ) Sleep(50);
 		EnterCriticalSection(&workData.cs);
 		memcpy(localBlockData, workData.workEntry[threadIndex].data, 128);
 		memcpy(serverData, workData.workEntry[threadIndex].serverData, 32);
@@ -339,7 +471,7 @@ int jhMiner_workerThread_xpt(int threadIndex)
 		//uint32 time1 = GetTickCount();
 		BitcoinMiner(&primecoinBlock, threadIndex);
 		//printf("Mining stopped after %dms\n", GetTickCount()-time1);
-		primecoinBlock.bnPrimeChainMultiplier = 0;
+		primecoinBlock.mpzPrimeChainMultiplier = 0;
 	}
 	return 0;
 }
@@ -537,15 +669,17 @@ int jhMiner_main_xptMode()
 			if( statsPassedTime < 1.0 )
 				statsPassedTime = 1.0; // avoid division by zero
 			double primesPerSecond = (double)primeStats.primeChainsFound / (statsPassedTime / 1000.0);
-			primeStats.primeLastUpdate = GetTickCount();
-			primeStats.primeChainsFound = 0;
+			//primeStats.primeLastUpdate = GetTickCount();
+			//primeStats.primeChainsFound = 0;
 			uint32 bestDifficulty = primeStats.bestPrimeChainDifficulty;
 			primeStats.bestPrimeChainDifficulty = 0;
 			double primeDifficulty = (double)bestDifficulty / (double)0x1000000;
 			if( workData.workEntry[0].dataIsValid )
 			{
 				primeStats.bestPrimeChainDifficultySinceLaunch = max(primeStats.bestPrimeChainDifficultySinceLaunch, primeDifficulty);
-				printf("primes/s: %d best difficulty: %f record: %f\n", (sint32)primesPerSecond, (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
+				double sharesPerHour = ((double)valid_shares / statsPassedTime) * 3600000.0;
+				double fiveChPerHour = ((double)primeStats.fiveChainCount / statsPassedTime) * 3600000.0;
+				printf("Shares/h: %.02f - 5ch/h: %.02f - PPS: %d - Best: %f - Max: %f\n", sharesPerHour, fiveChPerHour, (sint32)primesPerSecond, (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
 			}
 		}
 		// wait and check some stats
@@ -594,14 +728,25 @@ int jhMiner_main_xptMode()
 					memcpy(workData.workEntry[i].data, blockData, 80);
 					((serverData_t*)workData.workEntry[i].serverData)->blockHeight = workData.xptClient->blockWorkInfo.height;
 					((serverData_t*)workData.workEntry[i].serverData)->nBitsForShare = workData.xptClient->blockWorkInfo.nBitsShare;
+
 					// is the data really valid?
 					if( workData.xptClient->blockWorkInfo.nTime > 0 )
 						workData.workEntry[i].dataIsValid = true;
 					else
 						workData.workEntry[i].dataIsValid = false;
 				}
+				if (workData.xptClient->blockWorkInfo.height > 0)
+				{
+					double poolDiff = GetPrimeDifficulty( workData.xptClient->blockWorkInfo.nBitsShare);
+					double blockDiff = GetPrimeDifficulty( workData.xptClient->blockWorkInfo.nBits);
+					printf("---- New Block: %u - Diff: %.06f / %.06f ----\n", workData.xptClient->blockWorkInfo.height, blockDiff, poolDiff);
+					//printf("CH1: %u - CH2: %u - CHBiTwin: %u\n", 	primeStats.cunningham1Count, primeStats.cunningham2Count, primeStats.cunninghamBiTwinCount);
+					//primeStats.cunningham1Count = 0;
+					//primeStats.cunningham2Count = 0;
+					//primeStats.cunninghamBiTwinCount = 0;
+				}
 			}
-			Sleep(10);
+			Sleep(30);
 		}
 		loopCounter++;
 	}
@@ -631,10 +776,11 @@ int main(int argc, char **argv)
 	
 	printf("\n");
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  jhPrimeMiner (v0.31 beta)                                    \xBA\n");
+	printf("\xBA  jhPrimeMiner (v0.31 beta) mod by hg5fm                       \xBA\n");
 	printf("\xBA  author: JH (http://ypool.net)                                \xBA\n");
 	printf("\xBA  contributors: x3maniac                                       \xBA\n");
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
+	printf("\xBA  Credits: mikaelh for the performance optimizations		   \xBA\n");
 	printf("\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC\n");
 	printf("Launching miner...\n");
 	// set priority lower so the user still can do other things
@@ -674,8 +820,24 @@ int main(int argc, char **argv)
 	jsonRequestTarget.port = commandlineInput.port;
 	jsonRequestTarget.authUser = commandlineInput.workername;
 	jsonRequestTarget.authPass = commandlineInput.workerpass;
+
+	jsonLocalPrimeCoin.ip = "127.0.0.1";
+	jsonLocalPrimeCoin.port = 9912;
+	jsonLocalPrimeCoin.authUser = "primecoinrpc";
+	jsonLocalPrimeCoin.authPass = "x";
+
+	//lastBlockCount = queryLocalPrimecoindBlockCount(useLocalPrimecoindForLongpoll);
+
 	// init stats
 	primeStats.primeLastUpdate = GetTickCount();
+	primeStats.shareFound = false;
+	primeStats.shareRejected = false;
+	primeStats.primeChainsFound = 0;
+	primeStats.foundShareCount = 0;
+	primeStats.cunningham1Count = 0;
+	primeStats.cunningham2Count = 0;
+	primeStats.cunninghamBiTwinCount = 0;
+
 	// setup thread count and print info
 	printf("Using %d threads\n", commandlineInput.numThreads);
 	printf("Username: %s\n", jsonRequestTarget.authUser);
@@ -781,41 +943,41 @@ void debug_getSieveDataHash(CSieveOfEratosthenes* sieve, uint8* hashOut)
 	sha256_update(&ctx, (uint8*)sieve->vfCompositeBiTwin, (nMaxSieveSize+7)/8);
 	sha256_finish(&ctx, hashOut);
 }
-
-int mainPerformanceTest()
-{
-	GeneratePrimeTable();
-	// performance test for sieve generation
-	sint32 sieveSize = 1000000;
-	uint32 nBits = 0x07fb8bcc;
-	uint256 blockHashHeader;
-	yPoolWorkMgr_parseHexString("eed69c071ac2634ffc2a9e73177d1c5fad92fdf06f6d711c2f04877906ad6aef", 32*2, blockHashHeader.begin());
-	CBigNum fixedMultiplier = CBigNum(0xB);
-
-	uint8 orgSieveHash[32];
-	uint8 fastSieveHash[32];
-
-	printf("Generating original sieve and fast sieve...\n");
-	uint32 time1 = GetTickCount();
-	CSieveOfEratosthenes* originalSieve = new CSieveOfEratosthenes(sieveSize, nBits, blockHashHeader, fixedMultiplier);
-	while (originalSieve->WeaveOriginal() );
-	uint32 time2 = GetTickCount();
-	printf("Original sieve time: %8dms Hash: ", time2-time1);
-	debug_getSieveDataHash(originalSieve, orgSieveHash);
-	for(uint32 i=0; i<12; i++)
-		printf("%02x", orgSieveHash[i]);
-	puts("");
-	puts("Start generating fast sieve...\n");
-	uint32 time3 = GetTickCount();
-	CSieveOfEratosthenes* fastSieve = new CSieveOfEratosthenes(sieveSize, nBits, blockHashHeader, fixedMultiplier);
-	//while (fastSieve->WeaveFast2() );
-	fastSieve->WeaveFastAll();
-	uint32 time4 = GetTickCount();
-	printf("Fast sieve time:     %8dms Hash: ", time4-time3);
-	debug_getSieveDataHash(fastSieve, fastSieveHash);
-	for(uint32 i=0; i<12; i++)
-		printf("%02x", fastSieveHash[i]);
-	puts("");
-	while( true ) Sleep(1000);
-	return 0;
-}
+//
+//int mainPerformanceTest()
+//{
+//	GeneratePrimeTable();
+//	// performance test for sieve generation
+//	sint32 sieveSize = 1000000;
+//	uint32 nBits = 0x07fb8bcc;
+//	uint256 blockHashHeader;
+//	yPoolWorkMgr_parseHexString("eed69c071ac2634ffc2a9e73177d1c5fad92fdf06f6d711c2f04877906ad6aef", 32*2, blockHashHeader.begin());
+//	CBigNum fixedMultiplier = CBigNum(0xB);
+//
+//	uint8 orgSieveHash[32];
+//	uint8 fastSieveHash[32];
+//
+//	printf("Generating original sieve and fast sieve...\n");
+//	uint32 time1 = GetTickCount();
+//	CSieveOfEratosthenes* originalSieve = new CSieveOfEratosthenes(sieveSize, nBits, blockHashHeader, fixedMultiplier);
+//	while (originalSieve->WeaveOriginal() );
+//	uint32 time2 = GetTickCount();
+//	printf("Original sieve time: %8dms Hash: ", time2-time1);
+//	debug_getSieveDataHash(originalSieve, orgSieveHash);
+//	for(uint32 i=0; i<12; i++)
+//		printf("%02x", orgSieveHash[i]);
+//	puts("");
+//	puts("Start generating fast sieve...\n");
+//	uint32 time3 = GetTickCount();
+//	CSieveOfEratosthenes* fastSieve = new CSieveOfEratosthenes(sieveSize, nBits, blockHashHeader, fixedMultiplier);
+//	//while (fastSieve->WeaveFast2() );
+//	fastSieve->WeaveFastAll();
+//	uint32 time4 = GetTickCount();
+//	printf("Fast sieve time:     %8dms Hash: ", time4-time3);
+//	debug_getSieveDataHash(fastSieve, fastSieveHash);
+//	for(uint32 i=0; i<12; i++)
+//		printf("%02x", fastSieveHash[i]);
+//	puts("");
+//	while( true ) Sleep(1000);
+//	return 0;
+//}

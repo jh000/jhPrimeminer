@@ -37,12 +37,58 @@ int BN2_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
 #include"prime.h"
 #include"jsonrpc.h"
 
+#include "mpirxx.h"
+#include "mpir.h"
+#include<stdint.h>
 #include"xptServer.h"
 #include"xptClient.h"
 
 static const int64 COIN = 100000000;
 static const int64 CENT = 1000000;
 
+
+#define	bswap_16(value)  \
+ 	((((value) & 0xff) << 8) | ((value) >> 8))
+
+#define	bswap_32(value)	\
+ 	(((uint32_t)bswap_16((uint16_t)((value) & 0xffff)) << 16) | \
+ 	(uint32_t)bswap_16((uint16_t)((value) >> 16)))
+
+
+static inline uint32_t swab32(uint32_t v)
+{
+	return bswap_32(v);
+}
+
+static inline void swap32yes(void*out, const void*in, size_t sz) {
+	size_t swapcounter = 0;
+	for (swapcounter = 0; swapcounter < sz; ++swapcounter)
+		(((uint32_t*)out)[swapcounter]) = swab32(((uint32_t*)in)[swapcounter]);
+}
+
+#define BEGIN(a)            ((char*)&(a))
+#define END(a)              ((char*)&((&(a))[1]))
+#define swap32tobe(out, in, sz)  swap32yes(out, in, sz)
+
+
+template<typename T>
+std::string HexStr(const T itbegin, const T itend, bool fSpaces=false)
+{
+    std::string rv;
+    static const char hexmap[16] = { '0', '1', '2', '3', '4', '5', '6', '7',
+                                     '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+    rv.reserve((itend-itbegin)*3);
+    for(T it = itbegin; it < itend; ++it)
+    {
+        unsigned char val = (unsigned char)(*it);
+        if(fSpaces && it != itbegin)
+            rv.push_back(' ');
+        rv.push_back(hexmap[val>>4]);
+        rv.push_back(hexmap[val&15]);
+    }
+
+    return rv;
+}
 
 typedef struct  
 {
@@ -59,12 +105,21 @@ typedef struct
 typedef struct  
 {
 	volatile uint32 primeChainsFound;
+	volatile uint32 foundShareCount;
+	volatile uint32 fiveChainCount;
+	volatile uint32 cunningham1Count;
+	volatile uint32 cunningham2Count;
+	volatile uint32 cunninghamBiTwinCount;
+
 	// since we can generate many (useless) primes ultra fast if we simply set sieve size low, 
 	// its better if we only count primes with at least a given difficulty
 	//volatile uint32 qualityPrimesFound;
 	volatile uint32 bestPrimeChainDifficulty;
 	volatile double bestPrimeChainDifficultySinceLaunch;
 	uint32 primeLastUpdate;
+	bool shareFound;
+	bool shareRejected;
+
 }primeStats_t;
 
 extern primeStats_t primeStats;
@@ -79,7 +134,8 @@ typedef struct
 	uint32	nonce;
 	// GetHeaderHash() goes up to this offset (4+32+32+4+4+4=80 bytes)
 	uint256 blockHeaderHash;
-	CBigNum bnPrimeChainMultiplier;
+	CBigNum bnPrimeChainMultiplierBN;
+	mpz_class mpzPrimeChainMultiplier;
 	// other
 	serverData_t serverData;
 	uint32 threadIndex; // the index of the miner thread
@@ -102,3 +158,15 @@ extern volatile int total_shares;
 extern volatile int valid_shares;
 
 extern __declspec( thread ) BN_CTX* pctx;
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+#endif
+
+#if !HAVE_DECL_LE32DEC
+static inline uint32_t le32dec(const void *pp)
+{
+	const uint8_t *p = (uint8_t const *)pp;
+	return ((uint32_t)(p[0]) + ((uint32_t)(p[1]) << 8) +
+	    ((uint32_t)(p[2]) << 16) + ((uint32_t)(p[3]) << 24));
+}
+#endif
