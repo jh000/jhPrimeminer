@@ -34,8 +34,6 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 
 	primecoinBlock->nonce = 0;
 
-	uint32 nTime = GetTickCount() + 1000*60;
-	
 	// note: originally a wanted to loop as long as (primecoinBlock->workDataHash != jhMiner_getCurrentWorkHash()) did not happen
 	//		 but I noticed it might be smarter to just check if the blockHeight has changed, since that is what is really important
 	nPrimorialMultiplier = nPrimorialMultiplierStart;
@@ -48,7 +46,7 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 	time(&unixTimeStart);
 	uint32 nTimeRollStart = primecoinBlock->timestamp;
 
-	while( GetTickCount() < nTime && primecoinBlock->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(primecoinBlock->threadIndex) )
+	while( primecoinBlock->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(primecoinBlock->threadIndex) )
 	{
 
 		if( primecoinBlock->xptMode )

@@ -67,7 +67,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="lib\openssl\libeay32MT.lib lib\openssl\ssleay32MT.lib"
+				AdditionalDependencies="lib\openssl\libeay32MT.lib lib\openssl\ssleay32MT.lib lib\mpir\Release32\mpir.lib"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				TargetMachine="1"
@@ -141,7 +141,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="lib\openssl64\libeay32MT.lib lib\openssl64\ssleay32MT.lib"
+				AdditionalDependencies="lib\openssl64\libeay32MT.lib lib\openssl64\ssleay32MT.lib lib\mpir\Release64\mpir.lib"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				TargetMachine="17"
@@ -222,7 +222,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="lib\openssl\libeay32MT.lib lib\openssl\ssleay32MT.lib"
+				AdditionalDependencies="lib\openssl\libeay32MT.lib lib\openssl\ssleay32MT.lib lib\mpir\Release32\mpir.lib"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -300,7 +300,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="lib\openssl64\libeay32MT.lib lib\openssl64\ssleay32MT.lib"
+				AdditionalDependencies="lib\openssl64\libeay32MT.lib lib\openssl64\ssleay32MT.lib lib\mpir64\Release64\mpir.lib"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -896,6 +896,42 @@
 			<Filter
 				Name="jhbignum"
 				>
+			</Filter>
+			<Filter
+				Name="gmp"
+				>
+				<File
+					RelativePath=".\includes\mpir\config.h"
+					>
+				</File>
+				<File
+					RelativePath=".\includes\mpir\gmp-impl.h"
+					>
+				</File>
+				<File
+					RelativePath=".\includes\mpir\gmp-mparam.h"
+					>
+				</File>
+				<File
+					RelativePath=".\includes\mpir\gmp.h"
+					>
+				</File>
+				<File
+					RelativePath=".\includes\mpir\gmpxx.h"
+					>
+				</File>
+				<File
+					RelativePath=".\includes\mpir\longlong.h"
+					>
+				</File>
+				<File
+					RelativePath=".\includes\mpir\mpir.h"
+					>
+				</File>
+				<File
+					RelativePath=".\includes\mpir\mpirxx.h"
+					>
+				</File>
 			</Filter>
 		</Filter>
 		<Filter

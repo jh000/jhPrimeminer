@@ -496,6 +496,7 @@ bool TargetGetNext(unsigned int nBits, int64 nInterval, int64 nTargetSpacing, in
 	return true;
 }
 
+
 // Test Probable Cunningham Chain for: n
 // fSophieGermain:
 //   true - Test for Cunningham Chain of first kind (n, 2n+1, 4n+3, ...)
@@ -585,7 +586,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 		(*psieve)->WeaveFastAll();
 		
 
-		uint32 maskBytes = (nMaxSieveSize+7)/8;
+		//uint32 maskBytes = (nMaxSieveSize+7)/8;
 
 		//CSieveOfEratosthenes* sieve2 = new CSieveOfEratosthenes(nMaxSieveSize, block->nBits, block->blockHeaderHash, bnFixedMultiplier);
 		//while (sieve2->WeaveOriginal() );
@@ -602,7 +603,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 		//}
 		//printf("Sieve test complete\n");
 		
-		// printf("MineProbablePrimeChain() : new sieve (%u/%u) ready in %ums multiplier: %u\n", (*psieve)->GetCandidateCount(), nMaxSieveSize, (unsigned int) (GetTickCount() - nStart), bnFixedMultiplier);
+		//printf("MineProbablePrimeChain() : new sieve (%u/%u) ready in %ums multiplier: %u\n", (*psieve)->GetCandidateCount(), nMaxSieveSize, (unsigned int) (GetTickCount() - nStart), bnFixedMultiplier);
 	}
 
 	mpz_class bnChainOrigin;
@@ -932,18 +933,18 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 {
 	//mpz_class p = vPrimes[nPrimeSeq];
 	// init some required bignums on the stack (no dynamic allocation at all)
-	BIGNUM bn_p;
-	BIGNUM bn_tmp;
+	//BIGNUM bn_p;
+	//BIGNUM bn_tmp;
 	BIGNUM bn_fixedInverse;
 	BIGNUM bn_twoInverse;
 	BIGNUM bn_fixedMod;
-	uint32 bignumData_p[0x200/4];
-	uint32 bignumData_tmp[0x200/4];
+	//uint32 bignumData_p[0x200/4];
+	//uint32 bignumData_tmp[0x200/4];
 	uint32 bignumData_fixedInverse[0x200/4];
 	uint32 bignumData_twoInverse[0x200/4];
 	uint32 bignumData_fixedMod[0x200/4];
-	fastInitBignum(bn_p, bignumData_p);
-	fastInitBignum(bn_tmp, bignumData_tmp);
+	//fastInitBignum(bn_p, bignumData_p);
+	//fastInitBignum(bn_tmp, bignumData_tmp);
 	fastInitBignum(bn_fixedInverse, bignumData_fixedInverse);
 	fastInitBignum(bn_twoInverse, bignumData_twoInverse);
 	fastInitBignum(bn_fixedMod, bignumData_fixedMod);
@@ -951,21 +952,23 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 	unsigned int nChainLength = TargetGetLength(nBits);
 	unsigned int nChainLengthX2 = nChainLength*2;
 
+	uint32 primeLimit = nSieveSize;
+
 	while( true )
 	{
-		if (nPrimeSeq >= vPrimesSize || vPrimes[nPrimeSeq] >= nSieveSize)
+		if (nPrimeSeq >= vPrimesSize || vPrimes[nPrimeSeq] >= primeLimit)
 			return false;  // sieve has been completed
 
 	
-		BN_set_word(&bn_p, vPrimes[nPrimeSeq]);
+		//BN_set_word(&bn_p, vPrimes[nPrimeSeq]);
 
 
 
-		BN2_div(NULL, &bn_tmp, &bnFixedFactor, &bn_p);
-		
+		//BN2_div(NULL, &bn_tmp, &bnFixedFactor, &bn_p);
+		uint32 fixedFactorMod = BN_mod_word(&bnFixedFactor, vPrimes[nPrimeSeq]);
 		
 		//if (bnFixedFactor % p == 0)
-		if( BN_is_zero(&bn_tmp) )
+		if( fixedFactorMod == 0 )
 		{
 			// Nothing in the sieve is divisible by this prime
 			nPrimeSeq++;
@@ -985,7 +988,7 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 		//if( djf1 != djf2 )
 		//	__debugbreak();
 
-		BN_set_word(&bn_fixedInverse, single_modinv(bn_tmp.d[0], vPrimes[nPrimeSeq]));
+		//BN_set_word(&bn_fixedInverse, );
 
 		//mpz_class bnTwo = 2;
 		//if (!BN_mod_inverse(&bn_twoInverse, &bn_constTwo, &bn_p, pctx))
@@ -996,7 +999,7 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 		////BN_set_word(&bn_twoInverse, vPrimesTwoInverse[nPrimeSeq]);
 
 		uint64 pU64 = (uint64)vPrimes[nPrimeSeq];
-		uint64 fixedInverseU64 = BN_get_word(&bn_fixedInverse);
+		uint64 fixedInverseU64 = single_modinv(fixedFactorMod, vPrimes[nPrimeSeq]);//BN_get_word(&bn_fixedInverse);
 		uint64 twoInverseU64 = vPrimesTwoInverse[nPrimeSeq];//BN_get_word(&bn_twoInverse);
 		// Weave the sieve for the prime
 		for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < nChainLengthX2; nBiTwinSeq++)
