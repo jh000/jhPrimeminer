@@ -32,9 +32,9 @@ static unsigned int int_invert(unsigned int a, unsigned int nPrime);
 
 
 
-void GeneratePrimeTable()
+void GeneratePrimeTable(unsigned int nSieveSize)
 {
-    const unsigned nPrimeTableLimit = nMaxSieveSize ;
+    const unsigned int nPrimeTableLimit = nSieveSize ;
     vPrimes.clear();
 	// Generate prime table using sieve of Eratosthenes
     std::vector<bool> vfComposite (nPrimeTableLimit, false);
@@ -887,7 +887,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 	{
 		// Build sieve
 		*psieve = new CSieveOfEratosthenes(nMaxSieveSize, block->nBits, mpzHash, mpzFixedMultiplier);
-		(*psieve)->nSievePercentage = 8;
+		(*psieve)->nSievePercentage = nSievePercentage;
 		(*psieve)->Weave();
 	}
 
@@ -968,7 +968,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 		
 		nProbableChainLength = max(max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
 
-		if (nProbableChainLength >= 0x2000000)
+		if (nProbableChainLength >= 0x3000000)
 		{
 			primeStats.nChainHit += pow(8, ((float)((double)nProbableChainLength  / (double)0x1000000))-7.0);
 			//primeStats.nChainHit += pow(8, floor((float)((double)nProbableChainLength  / (double)0x1000000)) - 7);

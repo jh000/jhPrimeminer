@@ -12,11 +12,8 @@
 //#include "main.h"
 #include "mpirxx.h"
 
-//static const unsigned int nMaxSieveSize = 1000000u;
-//static const unsigned int nMaxSieveSize = 2000000u;
-//static const unsigned int nMaxSieveSize = 500000u;
-//static const unsigned int nMaxSieveSize = 1000000u;//800000u;
 extern unsigned int nMaxSieveSize;
+extern unsigned int nSievePercentage;
 static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
 static const CBigNum bnOne = 1;
 static const CBigNum bnTwo = 2;
@@ -34,7 +31,7 @@ extern unsigned int nTargetInitialLength;
 extern unsigned int nTargetMinLength;
 
 // Generate small prime table
-void GeneratePrimeTable();
+void GeneratePrimeTable(unsigned int nSieveSize);
 // Get next prime number of p
 //bool PrimeTableGetNextPrime(unsigned int* p);
 bool PrimeTableGetNextPrime(unsigned int& p);

@@ -7,6 +7,7 @@ primeStats_t primeStats = {0};
 volatile int total_shares = 0;
 volatile int valid_shares = 0;
 unsigned int nMaxSieveSize;
+unsigned int nSievePercentage;
 char* dt;
 
 bool error(const char *format, ...)
@@ -484,6 +485,8 @@ typedef struct
 	sint32 port;
 	sint32 numThreads;
 	sint32 sieveSize;
+	sint32 sievePercentage;
+	sint32 sievePrimeLimit;	// how many primes should be sieved
 }commandlineInput_t;
 
 commandlineInput_t commandlineInput = {0};
@@ -496,10 +499,16 @@ void jhMiner_printHelp()
 	puts("                                 You can specifiy an port after the url using -o url:port");
 	puts("   -u                            The username (workername) used for login");
 	puts("   -p                            The password used for login");
-	puts("   -t                            The number of threads for mining (default 1)");
-	puts("                                 For most efficient mining, set to number of cores");
-	puts("   -s                            Set MaxSieveSize range from 200000 - 10000000");
-	puts("                                 Default is 1000000.");
+	puts("   -t <num>                      The number of threads for mining (default 1)");
+	puts("										For most efficient mining, set to number of CPU cores");
+	puts("   -s <num>                      Set MaxSieveSize range from 200000 - 10000000");
+	puts("										Default is 1000000.");
+	puts("   -d <num>                      Set SievePercentage - range from 1 - 100");
+	puts("                                      Default is 8 and it's not recommended to use lower values.");
+	puts("                                      It limits how many base primes are used to filter out candidate multipliers in the sieve.");
+	puts("   -primes <num>                 Sets how many prime factors are used to filter the sieve");
+	puts("										Default is MaxSieveSize. Valid range: 300 - 200000000");
+
 	puts("Example usage:");
 	puts("   jhPrimeminer.exe -o http://poolurl.com:8332 -u workername.1 -p workerpass -t 4");
 }
@@ -511,7 +520,7 @@ void jhMiner_parseCommandline(int argc, char **argv)
 	{
 		char* argument = argv[cIdx];
 		cIdx++;
-		if( memcmp(argument, "-o", 2)==0 || memcmp(argument, "-O", 2)==0 )
+		if( memcmp(argument, "-o", 3)==0 || memcmp(argument, "-O", 3)==0 )
 		{
 			// -o
 			if( cIdx >= argc )
@@ -531,7 +540,7 @@ void jhMiner_parseCommandline(int argc, char **argv)
 			}
 			cIdx++;
 		}
-		else if( memcmp(argument, "-u", 2)==0 )
+		else if( memcmp(argument, "-u", 3)==0 )
 		{
 			// -u
 			if( cIdx >= argc )
@@ -542,7 +551,7 @@ void jhMiner_parseCommandline(int argc, char **argv)
 			commandlineInput.workername = fStrDup(argv[cIdx], 64);
 			cIdx++;
 		}
-		else if( memcmp(argument, "-p", 2)==0 )
+		else if( memcmp(argument, "-p", 3)==0 )
 		{
 			// -p
 			if( cIdx >= argc )
@@ -553,7 +562,7 @@ void jhMiner_parseCommandline(int argc, char **argv)
 			commandlineInput.workerpass = fStrDup(argv[cIdx], 64);
 			cIdx++;
 		}
-		else if( memcmp(argument, "-t", 2)==0 )
+		else if( memcmp(argument, "-t", 3)==0 )
 		{
 			// -t
 			if( cIdx >= argc )
@@ -569,7 +578,7 @@ void jhMiner_parseCommandline(int argc, char **argv)
 			}
 			cIdx++;
 		}
-		else if( memcmp(argument, "-s", 2)==0 )
+		else if( memcmp(argument, "-s", 3)==0 )
 		{
 			// -s
 			if( cIdx >= argc )
@@ -585,7 +594,39 @@ void jhMiner_parseCommandline(int argc, char **argv)
 			}
 			cIdx++;
 		}
-		else if( memcmp(argument, "-help", 5)==0 || memcmp(argument, "--help", 6)==0 )
+		else if( memcmp(argument, "-d", 3)==0 )
+		{
+			// -s
+			if( cIdx >= argc )
+			{
+				printf("Missing number after -s option\n");
+				ExitProcess(0);
+			}
+			commandlineInput.sievePercentage = atoi(argv[cIdx]);
+			if( commandlineInput.sievePercentage < 1 || commandlineInput.sievePercentage > 100 )
+			{
+				printf("-s parameter out of range, must be between 1 - 100");
+				ExitProcess(0);
+			}
+			cIdx++;
+		}
+		else if( memcmp(argument, "-primes", 7)==0 )
+		{
+			// -primes
+			if( cIdx >= argc )
+			{
+				printf("Missing number after -primes option\n");
+				ExitProcess(0);
+			}
+			commandlineInput.sievePrimeLimit = atoi(argv[cIdx]);
+			if( commandlineInput.sievePrimeLimit < 300 || commandlineInput.sievePrimeLimit > 200000000 )
+			{
+				printf("-primes parameter out of range, must be between 300 - 200000000");
+				ExitProcess(0);
+			}
+			cIdx++;
+		}
+		else if( memcmp(argument, "-help", 6)==0 || memcmp(argument, "--help", 7)==0 )
 		{
 			jhMiner_printHelp();
 			ExitProcess(0);
@@ -727,7 +768,7 @@ int jhMiner_main_xptMode()
 			uint32 passedTime = tickCount - time_updateWork;
 
 
-			if (tickCount - time_multiAdjust >= 5000)
+			if (tickCount - time_multiAdjust >= 10000)
 			{
 				MultiplierAutoAdjust();
 				time_multiAdjust = GetTickCount();
@@ -786,7 +827,7 @@ int jhMiner_main_xptMode()
 					double poolDiff = GetPrimeDifficulty( workData.xptClient->blockWorkInfo.nBitsShare);
 					double blockDiff = GetPrimeDifficulty( workData.xptClient->blockWorkInfo.nBits);
 					printf("---- New Block: %u - Diff: %.06f / %.06f\n", workData.xptClient->blockWorkInfo.height, blockDiff, poolDiff);
-					printf("---- Toal/Valid shares: [ %d / %d ]\n",valid_shares, total_shares);
+					printf("---- Total/Valid shares: [ %d / %d ]\n",valid_shares, total_shares);
 					printf("---- 6CH count: %u - 7CH count: %u - Max diff: %.005f\n", primeStats.sixChainCount, primeStats.sevenChainCount, (float)primeStats.bestPrimeChainDifficultySinceLaunch); 
 					printf("---- Adjusted PrimorialMultiplier: %u\n", primeStats.nPrimorialMultiplier);
 					printf("\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\n");
@@ -812,11 +853,16 @@ int main(int argc, char **argv)
 	GetSystemInfo( &sysinfo );
 	commandlineInput.numThreads = sysinfo.dwNumberOfProcessors;
 	commandlineInput.numThreads = max(commandlineInput.numThreads, 1);
-	commandlineInput.sieveSize = 1000000; // default maxSieveSize
+	commandlineInput.sieveSize = 0; // default maxSieveSize
+	commandlineInput.sievePercentage = 8; // default 
+	commandlineInput.sievePrimeLimit = commandlineInput.sieveSize;
 	// parse command lines
 	jhMiner_parseCommandline(argc, argv);
 	// Sets max sieve size
 	nMaxSieveSize = commandlineInput.sieveSize;
+	nSievePercentage = commandlineInput.sievePercentage;
+	if (commandlineInput.sievePrimeLimit == 0) //default before parsing 
+		commandlineInput.sievePrimeLimit = commandlineInput.sieveSize;  //default is sieveSize 
 	if( commandlineInput.host == NULL )
 	{
 		printf("Missing -o option\n");
@@ -826,7 +872,7 @@ int main(int argc, char **argv)
 	
 	printf("\n");
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  jhPrimeMiner (v0.31 beta) mod by hg5fm                       \xBA\n");
+	printf("\xBA  jhPrimeMiner - mod by hg5fm (mumus)	                        \xBA\n");
 	printf("\xBA  author: JH (http://ypool.net)                                \xBA\n");
 	printf("\xBA  contributors: x3maniac                                       \xBA\n");
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
@@ -840,7 +886,7 @@ int main(int argc, char **argv)
 	if( pctx == NULL )
 		pctx = BN_CTX_new();
 	// init prime table
-	GeneratePrimeTable();
+	GeneratePrimeTable(commandlineInput.sievePrimeLimit);
 	// init winsock
 	WSADATA wsa;
 	WSAStartup(MAKEWORD(2,2),&wsa);
@@ -962,6 +1008,9 @@ int main(int argc, char **argv)
 			Sleep(30*1000);
 		}
 	}
+
+	printf("\nSPH = 'Share per Hour', PPS = 'Primes per Second', Val/h = 'Share Value per Hour'\n\n");
+
 	// enter different mainloops depending on protocol mode
 	if( workData.protocolMode == MINER_PROTOCOL_GETWORK )
 		return jhMiner_main_getworkMode();
