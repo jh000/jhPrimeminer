@@ -16,11 +16,25 @@
 
 
 
-//#include"bignum_custom.h"
+// this acts as the global config structure
+typedef struct  
+{
+	char* workername;
+	char* workerpass;
+	char* host;
+	sint32 port;
+	sint32 numThreads;
+	sint32 sievePrimeLimit;	// how many primes should be sieved
+	sint32 sieveSize;		// how large is the sieve
+	bool cuda;
+	bool sieveForTwinChains; // sieve for twin chains
+}commandlineInput_t;
+
+extern commandlineInput_t commandlineInput;
+
+// OpenSSL stuff
 static const int PROTOCOL_VERSION = 70001;
-
 #include<openssl/bn.h>
-
 
 // our own improved versions of BN functions
 BIGNUM *BN2_mod_inverse(BIGNUM *in,	const BIGNUM *a, const BIGNUM *n, BN_CTX *ctx);
@@ -29,6 +43,7 @@ int BN2_num_bits(const BIGNUM *a);
 int BN2_rshift(BIGNUM *r, const BIGNUM *a, int n);
 int BN2_lshift(BIGNUM *r, const BIGNUM *a, int n);
 int BN2_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
+BN_ULONG BN2_mod_word(const BIGNUM *a, BN_ULONG w);
 
 #define fastInitBignum(bignumVar, bignumData) \
 	bignumVar.d = (BN_ULONG*)bignumData; \
@@ -67,7 +82,8 @@ typedef struct
 
 typedef struct  
 {
-	volatile uint32 primeChainsFound;
+	volatile uint32 numPrimeChainsFound;
+	volatile uint32 numTestedCandidates;
 	// since we can generate many (useless) primes ultra fast if we simply set sieve size low, 
 	// its better if we only count primes with at least a given difficulty
 	//volatile uint32 qualityPrimesFound;

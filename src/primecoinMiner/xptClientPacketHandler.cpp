@@ -99,6 +99,7 @@ bool xptClient_processPacket_shareAck(xptClient_t* xptClient)
 	char rejectReason[512];
 	xptPacketbuffer_readString(cpb, rejectReason, 512, &readError);
 	rejectReason[511] = '\0';
+	float shareValue = xptPacketbuffer_readFloat(cpb, &readError);
 	if( readError )
 		return false;
 	if( shareErrorCode == 0 )
@@ -108,7 +109,7 @@ bool xptClient_processPacket_shareAck(xptClient_t* xptClient)
 		time_t now = time(0);
 		char* dt = ctime(&now);
 		printf("Valid share found!");
-		printf("[ %d / %d ] %s",valid_shares, total_shares,dt);
+		printf(" [ %d / %d val: %.6f] %s", valid_shares, total_shares, shareValue, dt);
 	}
 	else
 	{

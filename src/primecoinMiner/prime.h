@@ -7,11 +7,6 @@
 
 //#include "main.h"
 
-//static const unsigned int nMaxSieveSize = 1000000u;
-//static const unsigned int nMaxSieveSize = 2000000u;
-//static const unsigned int nMaxSieveSize = 500000u;
-//static const unsigned int nMaxSieveSize = 1000000u;//800000u;
-extern unsigned int nMaxSieveSize;
 static const uint256 hashBlockHeaderLimit = (uint256(1) << 255);
 static const mpz_class bnOne = 1;
 static const mpz_class bnTwo = 2;
@@ -92,50 +87,41 @@ class CSieveOfEratosthenes
 	unsigned int nBits; // target of the prime chain to search for
 	uint256 hashBlockHeader; // block header hash
 	CBigNum bnFixedFactor; // fixed factor to derive the chain
-
 	// bitmaps of the sieve, index represents the variable part of multiplier
-	//std::vector<bool> vfCompositeCunningham1;
-	//std::vector<bool> vfCompositeCunningham2;
-	//std::vector<bool> vfCompositeBiTwin;
-
 	CAutoBN_CTX pctx;
 	BIGNUM bn_constTwo;
 	uint32 bignumData_constTwo[0x200/4];
-	//BIGNUM bn_nDelta1;
-	//uint32 bignumData_constTwo[0x200/4];
-
 	unsigned int nPrimeSeq; // prime sequence number currently being processed
 	unsigned int nCandidateMultiplier; // current candidate for power test
-
 
 public:
 	//bool* vfCompositeCunningham1;
 	//bool* vfCompositeCunningham2;
 	//bool* vfCompositeBiTwin;
 
-	uint8* vfCompositeCunningham1;
-	uint8* vfCompositeCunningham2;
-	uint8* vfCompositeBiTwin;
+	uint32* vfCompositeCunningham1;
+	uint32* vfCompositeCunningham2;
+	uint32* vfCompositeBiTwin;
 
 	CSieveOfEratosthenes(unsigned int nSieveSize, unsigned int nBits, uint256 hashBlockHeader, mpz_class& bnFixedMultiplier)
 	{
 		this->nSieveSize = nSieveSize;
 		this->nBits = nBits;
 		this->hashBlockHeader = hashBlockHeader;
-		//mpz_class mpzHashBlockHeader;
-		//mpz_set_uint256(mpzHashBlockHeader.get_mpz_t(), hashBlockHeader);
-
 		CBigNum bnFixedMultiplierTemp;
 		bnFixedMultiplierTemp.SetHex(bnFixedMultiplier.get_str(16));
 		this->bnFixedFactor = bnFixedMultiplierTemp * CBigNum(hashBlockHeader);
 		nPrimeSeq = 0;
-		uint32 maskBytes = (nMaxSieveSize+7)/8;
-		vfCompositeCunningham1 = (uint8*)malloc(sizeof(uint8)*maskBytes);
-		RtlZeroMemory(vfCompositeCunningham1, sizeof(uint8)*maskBytes);
-		vfCompositeCunningham2 = (uint8*)malloc(sizeof(uint8)*maskBytes);
-		RtlZeroMemory(vfCompositeCunningham2, sizeof(uint8)*maskBytes);
-		vfCompositeBiTwin = (uint8*)malloc(sizeof(uint8)*maskBytes);
-		RtlZeroMemory(vfCompositeBiTwin, sizeof(uint8)*maskBytes);
+		uint32 maskBytes = (commandlineInput.sieveSize+31)/32;
+		vfCompositeCunningham1 = (uint32*)malloc(sizeof(uint32)*maskBytes);
+		RtlZeroMemory(vfCompositeCunningham1, sizeof(uint32)*maskBytes);
+		vfCompositeCunningham2 = (uint32*)malloc(sizeof(uint32)*maskBytes);
+		RtlZeroMemory(vfCompositeCunningham2, sizeof(uint32)*maskBytes);
+		if( commandlineInput.sieveForTwinChains )
+		{
+			vfCompositeBiTwin = (uint32*)malloc(sizeof(uint32)*maskBytes);
+			RtlZeroMemory(vfCompositeBiTwin, sizeof(uint32)*maskBytes);
+		}
 		nCandidateMultiplier = 0;
 		// init bn_constTwo
 		bn_constTwo.d = (BN_ULONG*)bignumData_constTwo;
@@ -146,29 +132,43 @@ public:
 		BN_set_word(&bn_constTwo, 2);
 	}
 
-
-
 	~CSieveOfEratosthenes()
 	{
 		free(vfCompositeCunningham1);
 		free(vfCompositeCunningham2);
-		free(vfCompositeBiTwin);
+		if( commandlineInput.sieveForTwinChains )
+			free(vfCompositeBiTwin);
 	}
 
 	// Get total number of candidates for power test
 	unsigned int GetCandidateCount()
 	{
 		unsigned int nCandidates = 0;
-		for (unsigned int nMultiplier = 0; nMultiplier < nSieveSize; nMultiplier++)
+		if( commandlineInput.sieveForTwinChains )
 		{
-			uint32 byteIdx = nMultiplier>>3;
-			uint32 mask = 1<<(nMultiplier&7);
-			if (!(vfCompositeCunningham1[byteIdx]&mask) ||
-				!(vfCompositeCunningham2[byteIdx]&mask) ||
-				!(vfCompositeBiTwin[byteIdx]&mask))
-				nCandidates++;
+			for (unsigned int nMultiplier = 0; nMultiplier < nSieveSize; nMultiplier++)
+			{
+				uint32 byteIdx = nMultiplier>>5;
+				uint32 mask = 1<<(nMultiplier&31);
+				if (!(vfCompositeCunningham1[byteIdx]&mask) ||
+					!(vfCompositeCunningham2[byteIdx]&mask) ||
+					!(vfCompositeBiTwin[byteIdx]&mask))
+					nCandidates++;
+			}
+			return nCandidates;
 		}
-		return nCandidates;
+		else
+		{
+			for (unsigned int nMultiplier = 0; nMultiplier < nSieveSize; nMultiplier++)
+			{
+				uint32 byteIdx = nMultiplier>>5;
+				uint32 mask = 1<<(nMultiplier&31);
+				if (!(vfCompositeCunningham1[byteIdx]&mask) ||
+					!(vfCompositeCunningham2[byteIdx]&mask) )
+					nCandidates++;
+			}
+			return nCandidates;
+		}
 	}
 
 	// Scan for the next candidate multiplier (variable part)
@@ -177,23 +177,47 @@ public:
 	//   False - scan complete, no more candidate and reset scan
 	bool GetNextCandidateMultiplier(unsigned int& nVariableMultiplier)
 	{
-		for(;;)
+		if( commandlineInput.sieveForTwinChains )
 		{
-			nCandidateMultiplier++;
-			if (nCandidateMultiplier >= nSieveSize)
+			for(;;)
 			{
-				nCandidateMultiplier = 0;
-				return false;
-			}
-			uint32 byteIdx = nCandidateMultiplier>>3;
-			uint32 mask = 1<<(nCandidateMultiplier&7);
+				nCandidateMultiplier++;
+				if (nCandidateMultiplier >= nSieveSize)
+				{
+					nCandidateMultiplier = 0;
+					return false;
+				}
+				uint32 byteIdx = nCandidateMultiplier>>5;
+				uint32 mask = 1<<(nCandidateMultiplier&31);
 
-			if (!(vfCompositeCunningham1[byteIdx]&mask) ||
-				!(vfCompositeCunningham2[byteIdx]&mask) ||
-				!(vfCompositeBiTwin[byteIdx]&mask))
+				if (!(vfCompositeCunningham1[byteIdx]&mask) ||
+					!(vfCompositeCunningham2[byteIdx]&mask) ||
+					!(vfCompositeBiTwin[byteIdx]&mask))
+				{
+					nVariableMultiplier = nCandidateMultiplier;
+					return true;
+				}
+			}
+		}
+		else
+		{
+			for(;;)
 			{
-				nVariableMultiplier = nCandidateMultiplier;
-				return true;
+				nCandidateMultiplier++;
+				if (nCandidateMultiplier >= nSieveSize)
+				{
+					nCandidateMultiplier = 0;
+					return false;
+				}
+				uint32 byteIdx = nCandidateMultiplier>>5;
+				uint32 mask = 1<<(nCandidateMultiplier&31);
+
+				if (!(vfCompositeCunningham1[byteIdx]&mask) ||
+					!(vfCompositeCunningham2[byteIdx]&mask) )
+				{
+					nVariableMultiplier = nCandidateMultiplier;
+					return true;
+				}
 			}
 		}
 	}
@@ -202,10 +226,11 @@ public:
 	// Return values:
 	//   True  - weaved another prime; nComposite - number of composites removed
 	//   False - sieve already completed
-	bool WeaveOriginal();
+	//bool WeaveOriginal();
 	//bool WeaveFast();
 	//bool WeaveFast2();
 	bool WeaveFastAll();
+	bool WeaveFastAll_noTwin();
 	// bool WeaveAlt();
 };
 

@@ -6,7 +6,6 @@
 primeStats_t primeStats = {0};
 volatile int total_shares = 0;
 volatile int valid_shares = 0;
-unsigned int nMaxSieveSize;
 char* dt;
 
 bool error(const char *format, ...)
@@ -350,31 +349,24 @@ int jhMiner_workerThread_xpt(int threadIndex)
 	return 0;
 }
 
-typedef struct  
-{
-	char* workername;
-	char* workerpass;
-	char* host;
-	sint32 port;
-	sint32 numThreads;
-	sint32 sieveSize;
-	bool cuda;
-}commandlineInput_t;
-
 commandlineInput_t commandlineInput = {0};
 
 void jhMiner_printHelp()
 {
 	puts("Usage: jhPrimeminer.exe [options]");
 	puts("Options:");
-	puts("   -o, -O                        The miner will connect to this url");
+	puts("   -o, -O <url:port>             The miner will connect to this url");
 	puts("                                 You can specifiy an port after the url using -o url:port");
-	puts("   -u                            The username (workername) used for login");
-	puts("   -p                            The password used for login");
-	puts("   -t                            The number of threads for mining (default 1)");
+	puts("   -u <username>                 The username (workername) used for login");
+	puts("   -p <password>                 The password used for login");
+	puts("   -t <num_threads>              The number of threads for mining (default 1)");
 	puts("                                 For most efficient mining, set to number of cores");
-	puts("   -s                            Set MaxSieveSize range from 200000 - 10000000");
-	puts("                                 Default is 1000000.");
+	puts("   -s <size>                     Sets the size of the sieve");
+	puts("                                 Default is 2000000. Valid range: 200000 - 50000000");
+	puts("   -primes <num>                 Sets how many prime factors are used to filter the sieve");
+	puts("                                 Default is 400000. Valid range: 300 - 200000000");
+	puts("   -twin                         Enable sieving for twin chains");
+	puts("                                 Default is disabled");
 	puts("Example usage:");
 	puts("   jhPrimeminer.exe -o http://poolurl.com:8332 -u workername.1 -p workerpass -t 4");
 }
@@ -386,7 +378,7 @@ void jhMiner_parseCommandline(int argc, char **argv)
 	{
 		char* argument = argv[cIdx];
 		cIdx++;
-		if( memcmp(argument, "-o", 2)==0 || memcmp(argument, "-O", 2)==0 )
+		if( memcmp(argument, "-o", 2+1)==0 || memcmp(argument, "-O", 2+1)==0 )
 		{
 			// -o
 			if( cIdx >= argc )
@@ -406,7 +398,7 @@ void jhMiner_parseCommandline(int argc, char **argv)
 			}
 			cIdx++;
 		}
-		else if( memcmp(argument, "-u", 2)==0 )
+		else if( memcmp(argument, "-u", 2+1)==0 )
 		{
 			// -u
 			if( cIdx >= argc )
@@ -417,7 +409,7 @@ void jhMiner_parseCommandline(int argc, char **argv)
 			commandlineInput.workername = fStrDup(argv[cIdx], 64);
 			cIdx++;
 		}
-		else if( memcmp(argument, "-p", 2)==0 )
+		else if( memcmp(argument, "-p", 2+1)==0 )
 		{
 			// -p
 			if( cIdx >= argc )
@@ -428,7 +420,7 @@ void jhMiner_parseCommandline(int argc, char **argv)
 			commandlineInput.workerpass = fStrDup(argv[cIdx], 64);
 			cIdx++;
 		}
-		else if( memcmp(argument, "-t", 2)==0 )
+		else if( memcmp(argument, "-t", 2+1)==0 )
 		{
 			// -t
 			if( cIdx >= argc )
@@ -444,7 +436,7 @@ void jhMiner_parseCommandline(int argc, char **argv)
 			}
 			cIdx++;
 		}
-		else if( memcmp(argument, "-s", 2)==0 )
+		else if( memcmp(argument, "-s", 2+1)==0 )
 		{
 			// -s
 			if( cIdx >= argc )
@@ -453,18 +445,38 @@ void jhMiner_parseCommandline(int argc, char **argv)
 				ExitProcess(0);
 			}
 			commandlineInput.sieveSize = atoi(argv[cIdx]);
-			if( commandlineInput.sieveSize < 200000 || commandlineInput.sieveSize > 10000000 )
+			if( commandlineInput.sieveSize < 200000 || commandlineInput.sieveSize > 50000000 )
 			{
-				printf("-s parameter out of range, must be between 200000 - 10000000");
+				printf("-s parameter out of range, must be between 200000 - 50000000");
 				ExitProcess(0);
 			}
 			cIdx++;
 		}
-		else if( memcmp(argument, "-cuda", 5)==0 || memcmp(argument, "--cuda", 6)==0 )
+		else if( memcmp(argument, "-primes", 7)==0 )
+		{
+			// -primes
+			if( cIdx >= argc )
+			{
+				printf("Missing number after -primes option\n");
+				ExitProcess(0);
+			}
+			commandlineInput.sievePrimeLimit = atoi(argv[cIdx]);
+			if( commandlineInput.sievePrimeLimit < 300 || commandlineInput.sievePrimeLimit > 200000000 )
+			{
+				printf("-primes parameter out of range, must be between 300 - 200000000");
+				ExitProcess(0);
+			}
+			cIdx++;
+		}
+		else if( memcmp(argument, "-cuda", 6)==0 || memcmp(argument, "--cuda", 7)==0 )
 		{
 			commandlineInput.cuda = true;
 		}
-		else if( memcmp(argument, "-help", 5)==0 || memcmp(argument, "--help", 6)==0 )
+		else if( memcmp(argument, "-twin", 6)==0 || memcmp(argument, "--twin", 7)==0 )
+		{
+			commandlineInput.sieveForTwinChains = true;
+		}
+		else if( memcmp(argument, "-help", 6)==0 || memcmp(argument, "--help", 7)==0 )
 		{
 			jhMiner_printHelp();
 			ExitProcess(0);
@@ -502,16 +514,20 @@ int jhMiner_main_getworkMode()
 			double statsPassedTime = (double)(GetTickCount() - primeStats.primeLastUpdate);
 			if( statsPassedTime < 1.0 )
 				statsPassedTime = 1.0; // avoid division by zero
-			double primesPerSecond = (double)primeStats.primeChainsFound / (statsPassedTime / 1000.0);
-			primeStats.primeLastUpdate = GetTickCount();
-			primeStats.primeChainsFound = 0;
+			double primesPerSecond = (double)primeStats.numPrimeChainsFound / (statsPassedTime / 1000.0);
 			uint32 bestDifficulty = primeStats.bestPrimeChainDifficulty;
-			primeStats.bestPrimeChainDifficulty = 0;
 			double primeDifficulty = (double)bestDifficulty / (double)0x1000000;
+			float primalityPct = 0.0f;
+			if( primeStats.numTestedCandidates > 0 )
+				primalityPct = (float)primeStats.numPrimeChainsFound / (float)primeStats.numTestedCandidates;
+			primeStats.numPrimeChainsFound = 0;
+			primeStats.bestPrimeChainDifficulty = 0;
+			primeStats.numTestedCandidates = 0;
+			primeStats.primeLastUpdate = GetTickCount();
 			if( workData.workEntry[0].dataIsValid )
 			{
 				primeStats.bestPrimeChainDifficultySinceLaunch = max(primeStats.bestPrimeChainDifficultySinceLaunch, primeDifficulty);
-				printf("primes/s: %d best difficulty: %f record: %f\n", (sint32)primesPerSecond, (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
+				printf("primes/s: %d primality: %f%% best difficulty: %f record: %f\n", (sint32)primesPerSecond, (float)primalityPct, (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
 			}
 		}		
 		// wait and check some stats
@@ -547,16 +563,25 @@ int jhMiner_main_xptMode()
 			double statsPassedTime = (double)(GetTickCount() - primeStats.primeLastUpdate);
 			if( statsPassedTime < 1.0 )
 				statsPassedTime = 1.0; // avoid division by zero
-			double primesPerSecond = (double)primeStats.primeChainsFound / (statsPassedTime / 1000.0);
-			primeStats.primeLastUpdate = GetTickCount();
-			primeStats.primeChainsFound = 0;
+			double primesPerSecond = (double)primeStats.numPrimeChainsFound / (statsPassedTime / 1000.0);
 			uint32 bestDifficulty = primeStats.bestPrimeChainDifficulty;
-			primeStats.bestPrimeChainDifficulty = 0;
 			double primeDifficulty = (double)bestDifficulty / (double)0x1000000;
+			double primalityPct = (double)primeStats.numPrimeChainsFound / (double)primeStats.numTestedCandidates;
+			uint32 networkDifficultyInt = *(uint32*)(workData.workEntry[0].data+8+64);
+			networkDifficultyInt >>= 24;
+			// note: blockChance is a very rough estimate to how likely it is that we find a chain of the needed length (ignoring the fractional part)
+			double blockChance = pow(primalityPct, (double)networkDifficultyInt);
+			blockChance = blockChance * (double)primeStats.numTestedCandidates - pow(blockChance, (double)primeStats.numTestedCandidates);
+			blockChance *= 100.0;
+			primalityPct *= 100.0;
+			primeStats.numPrimeChainsFound = 0;
+			primeStats.bestPrimeChainDifficulty = 0;
+			primeStats.numTestedCandidates = 0;
+			primeStats.primeLastUpdate = GetTickCount();
 			if( workData.workEntry[0].dataIsValid )
 			{
 				primeStats.bestPrimeChainDifficultySinceLaunch = max(primeStats.bestPrimeChainDifficultySinceLaunch, primeDifficulty);
-				printf("primes/s: %d best difficulty: %f record: %f\n", (sint32)primesPerSecond, (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
+				printf("primality: %.2f%% blockChance: %.8f%% best difficulty: %.2f record: %.2f\n", (float)primalityPct, (float)blockChance, (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
 			}
 		}
 		// wait and check some stats
@@ -628,21 +653,17 @@ int main(int argc, char **argv)
 	GetSystemInfo( &sysinfo );
 	commandlineInput.numThreads = sysinfo.dwNumberOfProcessors;
 	commandlineInput.numThreads = max(commandlineInput.numThreads, 1);
-	commandlineInput.sieveSize = 800000; // default maxSieveSize
+	commandlineInput.sieveSize = 2000000; // default maxSieveSize
+	commandlineInput.sievePrimeLimit = 400000;
 	// parse command lines
 	jhMiner_parseCommandline(argc, argv);
-	// Sets max sieve size
-	nMaxSieveSize = commandlineInput.sieveSize;
 	if( commandlineInput.host == NULL )
 	{
 		printf("Missing -o option\n");
 		ExitProcess(-1);
 	}
-	//CRYPTO_set_mem_ex_functions(mallocEx, reallocEx, freeEx);
-	
-	printf("\n");
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  jhPrimeMiner (v0.33 beta)                                    \xBA\n");
+	printf("\xBA  jhPrimeMiner (v0.34 beta)                                    \xBA\n");
 	printf("\xBA  author: JH (http://ypool.net)                                \xBA\n");
 	printf("\xBA  contributors: x3maniac                                       \xBA\n");
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
@@ -660,6 +681,8 @@ int main(int argc, char **argv)
 		pctx = BN_CTX_new();
 	// init prime table
 	GeneratePrimeTable();
+	printf("Sieve size: %d\n", commandlineInput.sieveSize);
+	printf("Primelimit to factor: %d\n", commandlineInput.sievePrimeLimit);
 	// init winsock
 	WSADATA wsa;
 	WSAStartup(MAKEWORD(2,2),&wsa);
@@ -765,72 +788,5 @@ int main(int argc, char **argv)
 	else if( workData.protocolMode == MINER_PROTOCOL_XPUSHTHROUGH )
 		return jhMiner_main_xptMode();
 
-	return 0;
-}
-
-///*
-// * We need to call this before the actual initialization of the bignum constants in prime.h and other files
-// */
-//int preMain_initCryptoMemFunctions()
-//{
-//	//mallocSpeedupInit();
-//	/*CRYPTO_set_mem_ex_functions(mallocEx, reallocEx, freeEx);
-//	CRYPTO_set_mem_debug_functions(NULL, NULL, NULL, NULL, NULL);*/
-//	// See comment above mallocEx() method
-//	return 0;
-//}
-//
-//typedef int cb(void);
-//
-//#pragma data_seg(".CRT$XIU")
-//static cb *autostart[] = { preMain_initCryptoMemFunctions };
-//
-//#pragma data_seg() /* reset data-segment */
-
-void debug_getSieveDataHash(CSieveOfEratosthenes* sieve, uint8* hashOut)
-{
-	sha256_context ctx;
-	sha256_starts(&ctx);
-	sha256_update(&ctx, (uint8*)sieve->vfCompositeCunningham1, (nMaxSieveSize+7)/8);
-	sha256_update(&ctx, (uint8*)sieve->vfCompositeCunningham2, (nMaxSieveSize+7)/8);
-	sha256_update(&ctx, (uint8*)sieve->vfCompositeBiTwin, (nMaxSieveSize+7)/8);
-	sha256_finish(&ctx, hashOut);
-}
-
-int mainPerformanceTest()
-{
-	GeneratePrimeTable();
-	// performance test for sieve generation
-	sint32 sieveSize = 800000;
-	uint32 nBits = 0x07fb8bcc;
-	uint256 blockHashHeader;
-	yPoolWorkMgr_parseHexString("eed69c071ac2634ffc2a9e73177d1c5fad92fdf06f6d711c2f04877906ad6aef", 32*2, blockHashHeader.begin());
-	mpz_class fixedMultiplier = mpz_class(0xB);
-
-	uint8 orgSieveHash[32];
-	uint8 fastSieveHash[32];
-
-	printf("Generating original sieve and fast sieve...\n");
-	uint32 time1 = GetTickCount();
-	CSieveOfEratosthenes* originalSieve = new CSieveOfEratosthenes(sieveSize, nBits, blockHashHeader, fixedMultiplier);
-	while (originalSieve->WeaveOriginal() );
-	uint32 time2 = GetTickCount();
-	printf("Original sieve time: %8dms Hash: ", time2-time1);
-	debug_getSieveDataHash(originalSieve, orgSieveHash);
-	for(uint32 i=0; i<12; i++)
-		printf("%02x", orgSieveHash[i]);
-	puts("");
-	puts("Start generating fast sieve...\n");
-	uint32 time3 = GetTickCount();
-	CSieveOfEratosthenes* fastSieve = new CSieveOfEratosthenes(sieveSize, nBits, blockHashHeader, fixedMultiplier);
-	//while (fastSieve->WeaveFast2() );
-	fastSieve->WeaveFastAll();
-	uint32 time4 = GetTickCount();
-	printf("Fast sieve time:     %8dms Hash: ", time4-time3);
-	debug_getSieveDataHash(fastSieve, fastSieveHash);
-	for(uint32 i=0; i<12; i++)
-		printf("%02x", fastSieveHash[i]);
-	puts("");
-	while( true ) Sleep(1000);
 	return 0;
 }

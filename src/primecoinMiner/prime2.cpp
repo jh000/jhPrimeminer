@@ -96,12 +96,11 @@ int isqrt(long n) {
 
 void GeneratePrimeTable()
 {
-	static const unsigned int nPrimeTableLimit = nMaxSieveSize;
+	static const unsigned int nPrimeTableLimit = commandlineInput.sievePrimeLimit;
 	//vPrimes.clear();
 	vPrimesSize = 0;
 	vPrimes = (uint32*)malloc(sizeof(uint32)*nPrimeTableLimit);
-	// Generate prime table using sieve of Eratosthenes
-	//std::vector<bool> vfComposite (nPrimeTableLimit, false);
+	// Generate prime table using sieve of Atkin
 	uint8* vfComposite = (uint8*)malloc(nPrimeTableLimit);
 	RtlZeroMemory(vfComposite, nPrimeTableLimit);
 	for (unsigned int nFactor = 2; nFactor * nFactor < nPrimeTableLimit; nFactor++)
@@ -112,22 +111,19 @@ void GeneratePrimeTable()
 			vfComposite[nComposite] = true;
 	}
 	for (unsigned int n = 2; n < nPrimeTableLimit; n++)
+	{
 		if (!vfComposite[n])
 		{
 			vPrimes[vPrimesSize] = n;
 			vPrimesSize++;
-			//customBuffer_add(list_primeTable, &n);//vPrimes.push_back(n);
 		}
-	printf("GeneratePrimeTable() : prime table [1, %d] generated with %lu primes", nPrimeTableLimit, vPrimesSize);
-	//BOOST_FOREACH(unsigned int nPrime, vPrimes)
-	//    printf(" %u", nPrime);
-	printf("\n");
+	}
+	printf("GeneratePrimeTable() : prime table [1, %d] generated with %lu primes\n", nPrimeTableLimit, vPrimesSize);
 	free(vfComposite);
 	vPrimes = (uint32*)realloc(vPrimes, sizeof(uint32)*vPrimesSize);
 	// calculate two's inverse for all primes
 	vPrimesTwoInverse = (uint32*)malloc(sizeof(uint32)*vPrimesSize);
 	CBigNum bnTwo = 2;
-	// BN_CTX 
 	BIGNUM bn_twoInverse = {0};
 	BN_init(&bn_twoInverse);
 	BIGNUM bn_p = {0};
@@ -582,28 +578,12 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 		//uint32 sieveStopTimeLimit = nStart + 2000;
 		//for(uint32 i=0; i<256/8; i++)
 		//	printf("%02x", block->blockHeaderHash.begin()[i]);
-		*psieve = new CSieveOfEratosthenes(nMaxSieveSize, block->nBits, block->blockHeaderHash, bnFixedMultiplier);
-		(*psieve)->WeaveFastAll();
-		
-
-		//uint32 maskBytes = (nMaxSieveSize+7)/8;
-
-		//CSieveOfEratosthenes* sieve2 = new CSieveOfEratosthenes(nMaxSieveSize, block->nBits, block->blockHeaderHash, bnFixedMultiplier);
-		//while (sieve2->WeaveOriginal() );
-		//	
-		//for(uint32 i=0; i<maskBytes; i++)
-		//{
-		//	if( (*psieve)->vfCompositeBiTwin[i] != sieve2->vfCompositeBiTwin[i] )
-		//		__debugbreak();
-		//	if( (*psieve)->vfCompositeCunningham1[i] != sieve2->vfCompositeCunningham1[i] )
-		//		__debugbreak();
-		//	if( (*psieve)->vfCompositeCunningham2[i] != sieve2->vfCompositeCunningham2[i] )
-		//		__debugbreak();
-
-		//}
-		//printf("Sieve test complete\n");
-		
-		//printf("MineProbablePrimeChain() : new sieve (%u/%u) ready in %ums multiplier: %u\n", (*psieve)->GetCandidateCount(), nMaxSieveSize, (unsigned int) (GetTickCount() - nStart), bnFixedMultiplier);
+		*psieve = new CSieveOfEratosthenes(commandlineInput.sieveSize, block->nBits, block->blockHeaderHash, bnFixedMultiplier);
+		if( commandlineInput.sieveForTwinChains )
+			(*psieve)->WeaveFastAll();
+		else
+			(*psieve)->WeaveFastAll_noTwin();
+		//printf("MineProbablePrimeChain() : new sieve (%u/%u) ready in %ums multiplier: %u\n", (*psieve)->GetCandidateCount(), commandlineInput.sieveSize, (unsigned int) (GetTickCount() - nStart), bnFixedMultiplier);
 	}
 
 	mpz_class bnChainOrigin;
@@ -612,10 +592,8 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 	//nCurrent = nStart;
 
 	//uint32 timeStop = GetTickCount() + 25000;
-	uint32 nTries = 0;
-	while ( nTries < 15000 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex) )
+	while ( block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex) )
 	{
-		nTries++;
 		nTests++;
 		if (!(*psieve)->GetNextCandidateMultiplier(nTriedMultiplier))
 		{
@@ -644,7 +622,9 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 			canSubmitAsShare = true;
 		//if( nBitsGen >= 0x03000000 )
 		//	printf("%08X\n", nBitsGen);
-		primeStats.primeChainsFound++;
+		if( nProbableChainLength >= 0x01000000 )
+			primeStats.numPrimeChainsFound++;
+		primeStats.numTestedCandidates++;
 		//if( nProbableChainLength > 0x03000000 )
 		//	primeStats.qualityPrimesFound++;
 		if( nProbableChainLength > primeStats.bestPrimeChainDifficulty )
@@ -802,63 +782,6 @@ unsigned int EstimateWorkTransition(unsigned int nPrevWorkTransition, unsigned i
 	return nWorkTransition;
 }
 
-//// prime chain type and length value
-//std::string GetPrimeChainName(unsigned int nChainType, unsigned int nChainLength)
-//{
-//	return strprintf("%s%s", (nChainType==PRIME_CHAIN_CUNNINGHAM1)? "1CC" : ((nChainType==PRIME_CHAIN_CUNNINGHAM2)? "2CC" : "TWN"), TargetToString(nChainLength).c_str());
-//}
-
-// Weave sieve for the next prime in table
-// Return values:
-//   True  - weaved another prime; nComposite - number of composites removed
-//   False - sieve already completed
-bool CSieveOfEratosthenes::WeaveOriginal()
-{
-	if (nPrimeSeq >= vPrimesSize || vPrimes[nPrimeSeq] >= nSieveSize)
-		return false;  // sieve has been completed
-	CBigNum p = vPrimes[nPrimeSeq];
-	if (bnFixedFactor % p == 0)
-	{
-		// Nothing in the sieve is divisible by this prime
-		nPrimeSeq++;
-		return true;
-	}
-	// Find the modulo inverse of fixed factor
-	CBigNum bnFixedInverse;
-	if (!BN_mod_inverse(&bnFixedInverse, &bnFixedFactor, &p, pctx))
-		return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-	CBigNum bnTwo = 2;
-	CBigNum bnTwoInverse;
-	if (!BN_mod_inverse(&bnTwoInverse, &bnTwo, &p, pctx))
-		return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-
-	// Weave the sieve for the prime
-	unsigned int nChainLength = TargetGetLength(nBits);
-	for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
-	{
-		// Find the first number that's divisible by this prime
-		int nDelta = ((nBiTwinSeq % 2 == 0)? (-1) : 1);
-		unsigned int nSolvedMultiplier = ((bnFixedInverse * (p - nDelta)) % p).getuint();
-		if (nBiTwinSeq % 2 == 1)
-			bnFixedInverse *= bnTwoInverse; // for next number in chain
-
-		unsigned int nPrime = vPrimes[nPrimeSeq];
-		if (nBiTwinSeq < nChainLength)
-			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-				vfCompositeBiTwin[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
-		if (((nBiTwinSeq & 1u) == 0))
-			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-				vfCompositeCunningham1[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
-		if (((nBiTwinSeq & 1u) == 1u))
-			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-				vfCompositeCunningham2[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
-	}
-	nPrimeSeq++;
-	//delete[] p;
-	return true;
-}
-
-
 /* akruppa's code */
 int single_modinv (int a, int modulus)
 { /* start of single_modinv */
@@ -952,26 +875,13 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 	unsigned int nChainLength = TargetGetLength(nBits);
 	unsigned int nChainLengthX2 = nChainLength*2;
 
-	uint32 primeLimit = nSieveSize;
-
-	while( true )
+	for(uint32 nPrimeSeq=0; nPrimeSeq<vPrimesSize; nPrimeSeq++)
 	{
-		if (nPrimeSeq >= vPrimesSize || vPrimes[nPrimeSeq] >= primeLimit)
-			return false;  // sieve has been completed
-
-	
-		//BN_set_word(&bn_p, vPrimes[nPrimeSeq]);
-
-
-
-		//BN2_div(NULL, &bn_tmp, &bnFixedFactor, &bn_p);
-		uint32 fixedFactorMod = BN_mod_word(&bnFixedFactor, vPrimes[nPrimeSeq]);
-		
+		uint32 fixedFactorMod = BN2_mod_word(&bnFixedFactor, vPrimes[nPrimeSeq]);
 		//if (bnFixedFactor % p == 0)
 		if( fixedFactorMod == 0 )
 		{
 			// Nothing in the sieve is divisible by this prime
-			nPrimeSeq++;
 			continue;
 		}
 
@@ -995,7 +905,7 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 		//	return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
 		//if( BN_cmp(&bn_twoInverse, &mpz_class(vPrimesTwoInverse[nPrimeSeq])) )
 		//	__debugbreak();
-		
+
 		////BN_set_word(&bn_twoInverse, vPrimesTwoInverse[nPrimeSeq]);
 
 		uint64 pU64 = (uint64)vPrimes[nPrimeSeq];
@@ -1023,7 +933,7 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 			//if( nSolvedMultiplier != nSolvedMultiplier2 )
 			//	__debugbreak();
 
-		
+
 
 			if (nBiTwinSeq % 2 == 1)
 			{
@@ -1033,16 +943,70 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 			unsigned int nPrime = vPrimes[nPrimeSeq];
 			if (nBiTwinSeq < nChainLength)
 				for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-					vfCompositeBiTwin[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
-			if (((nBiTwinSeq & 1u) == 0))
+					vfCompositeBiTwin[nVariableMultiplier>>5] |= 1<<(nVariableMultiplier&31);
+			if ( nBiTwinSeq & 1 )
 				for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-					vfCompositeCunningham1[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
-			if (((nBiTwinSeq & 1u) == 1u))
+					vfCompositeCunningham2[nVariableMultiplier>>5] |= 1<<(nVariableMultiplier&31);
+			else
 				for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-					vfCompositeCunningham2[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
+					vfCompositeCunningham1[nVariableMultiplier>>5] |= 1<<(nVariableMultiplier&31);
+		}
+	}
+	return false; // never reached
+}
+
+// Weave sieve for the next prime in table, ignores twin chains (only searches for Cunningham Chains)
+// Return values:
+//   True  - weaved another prime; nComposite - number of composites removed
+//   False - sieve already completed
+bool CSieveOfEratosthenes::WeaveFastAll_noTwin()
+{
+	//mpz_class p = vPrimes[nPrimeSeq];
+	// init some required bignums on the stack (no dynamic allocation at all)
+	//BIGNUM bn_p;
+	//BIGNUM bn_tmp;
+	BIGNUM bn_fixedInverse;
+	BIGNUM bn_twoInverse;
+	BIGNUM bn_fixedMod;
+	//uint32 bignumData_p[0x200/4];
+	//uint32 bignumData_tmp[0x200/4];
+	uint32 bignumData_fixedInverse[0x200/4];
+	uint32 bignumData_twoInverse[0x200/4];
+	uint32 bignumData_fixedMod[0x200/4];
+	//fastInitBignum(bn_p, bignumData_p);
+	//fastInitBignum(bn_tmp, bignumData_tmp);
+	fastInitBignum(bn_fixedInverse, bignumData_fixedInverse);
+	fastInitBignum(bn_twoInverse, bignumData_twoInverse);
+	fastInitBignum(bn_fixedMod, bignumData_fixedMod);
+
+	unsigned int nChainLength = TargetGetLength(nBits);
+	for(uint32 nPrimeSeq=0; nPrimeSeq<vPrimesSize; nPrimeSeq++)
+	{
+		uint32 fixedFactorMod = BN2_mod_word(&bnFixedFactor, vPrimes[nPrimeSeq]);
+		if( fixedFactorMod == 0 )
+		{
+			// Nothing in the sieve is divisible by this prime
+			continue;
 		}
 
-		nPrimeSeq++;
+		uint64 pU64 = (uint64)vPrimes[nPrimeSeq];
+		uint64 fixedInverseU64 = single_modinv(fixedFactorMod, vPrimes[nPrimeSeq]);//BN_get_word(&bn_fixedInverse);
+		uint64 twoInverseU64 = vPrimesTwoInverse[nPrimeSeq];//BN_get_word(&bn_twoInverse);
+		// Weave the sieve for the prime
+		uint64 nSolvedMultiplier;
+		unsigned int nPrime = vPrimes[nPrimeSeq];
+		for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < nChainLength; nBiTwinSeq++)
+		{
+			// first pass
+			nSolvedMultiplier = ((fixedInverseU64) * (pU64 + 1ULL)) % pU64;
+			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
+				vfCompositeCunningham1[nVariableMultiplier>>5] |= 1<<(nVariableMultiplier&31);
+			// second pass
+			nSolvedMultiplier = ((fixedInverseU64) * (pU64 - 1ULL)) % pU64;
+			fixedInverseU64 = (fixedInverseU64*twoInverseU64)%pU64;
+			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
+				vfCompositeCunningham2[nVariableMultiplier>>5] |= 1<<(nVariableMultiplier&31);
+		}
 	}
 	return false; // never reached
 }
