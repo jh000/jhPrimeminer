@@ -362,11 +362,10 @@ void jhMiner_printHelp()
 	puts("   -t <num_threads>              The number of threads for mining (default 1)");
 	puts("                                 For most efficient mining, set to number of cores");
 	puts("   -s <size>                     Sets the size of the sieve");
-	puts("                                 Default is 2000000. Valid range: 200000 - 50000000");
+	puts("                                 Default is 1000000. Valid range: 200000 - 50000000");
 	puts("   -primes <num>                 Sets how many prime factors are used to filter the sieve");
-	puts("                                 Default is 400000. Valid range: 300 - 200000000");
-	puts("   -twin                         Enable sieving for twin chains");
-	puts("                                 Default is disabled");
+	puts("                                 Default is 800000. Valid range: 300 - 200000000");
+	puts("   -noTwin                       Disable sieving for twin chains");
 	puts("Example usage:");
 	puts("   jhPrimeminer.exe -o http://poolurl.com:8332 -u workername.1 -p workerpass -t 4");
 }
@@ -472,9 +471,9 @@ void jhMiner_parseCommandline(int argc, char **argv)
 		{
 			commandlineInput.cuda = true;
 		}
-		else if( memcmp(argument, "-twin", 6)==0 || memcmp(argument, "--twin", 7)==0 )
+		else if( memcmp(argument, "-notwin", 8)==0 || memcmp(argument, "-noTwin", 8)==0 || memcmp(argument, "--notwin", 9)==0 || memcmp(argument, "--noTwin", 9)==0 )
 		{
-			commandlineInput.sieveForTwinChains = true;
+			commandlineInput.sieveForTwinChains = false;
 		}
 		else if( memcmp(argument, "-help", 6)==0 || memcmp(argument, "--help", 7)==0 )
 		{
@@ -653,8 +652,9 @@ int main(int argc, char **argv)
 	GetSystemInfo( &sysinfo );
 	commandlineInput.numThreads = sysinfo.dwNumberOfProcessors;
 	commandlineInput.numThreads = max(commandlineInput.numThreads, 1);
-	commandlineInput.sieveSize = 2000000; // default maxSieveSize
-	commandlineInput.sievePrimeLimit = 400000;
+	commandlineInput.sieveSize = 1000000; // default maxSieveSize
+	commandlineInput.sievePrimeLimit = 800000;
+	commandlineInput.sieveForTwinChains = true;
 	// parse command lines
 	jhMiner_parseCommandline(argc, argv);
 	if( commandlineInput.host == NULL )
@@ -663,7 +663,7 @@ int main(int argc, char **argv)
 		ExitProcess(-1);
 	}
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  jhPrimeMiner (v0.34 beta)                                    \xBA\n");
+	printf("\xBA  jhPrimeMiner (v0.35 beta)                                    \xBA\n");
 	printf("\xBA  author: JH (http://ypool.net)                                \xBA\n");
 	printf("\xBA  contributors: x3maniac                                       \xBA\n");
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");

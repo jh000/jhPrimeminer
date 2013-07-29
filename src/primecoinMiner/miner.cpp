@@ -19,10 +19,10 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 
 	static int startFactorList[4] =
 	{
-		//7,7,7,7 <-- ??
 		107,107,107,107
-		// 9697,9697,9697,9697
+		//131,131,131,131
 	};
+	// there is a much better way to do all the primorial and fixedMutliplier calculation, but this has to suffice for now...
 	nPrimorialMultiplierStart = startFactorList[(threadIndex&3)];
 
 	unsigned int nPrimorialMultiplier = nPrimorialMultiplierStart;
