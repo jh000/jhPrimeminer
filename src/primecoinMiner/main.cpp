@@ -500,14 +500,14 @@ void jhMiner_printHelp()
 	puts("   -u                            The username (workername) used for login");
 	puts("   -p                            The password used for login");
 	puts("   -t <num>                      The number of threads for mining (default 1)");
-	puts("										For most efficient mining, set to number of CPU cores");
+	puts("                                     For most efficient mining, set to number of CPU cores");
 	puts("   -s <num>                      Set MaxSieveSize range from 200000 - 10000000");
-	puts("										Default is 1000000.");
+	puts("                                     Default is 1000000.");
 	puts("   -d <num>                      Set SievePercentage - range from 1 - 100");
-	puts("                                      Default is 8 and it's not recommended to use lower values.");
-	puts("                                      It limits how many base primes are used to filter out candidate multipliers in the sieve.");
+	puts("                                     Default is 8 and it's not recommended to use lower values.");
+	puts("                                     It limits how many base primes are used to filter out candidate multipliers in the sieve.");
 	puts("   -primes <num>                 Sets how many prime factors are used to filter the sieve");
-	puts("										Default is MaxSieveSize. Valid range: 300 - 200000000");
+	puts("                                     Default is MaxSieveSize. Valid range: 300 - 200000000");
 
 	puts("Example usage:");
 	puts("   jhPrimeminer.exe -o http://poolurl.com:8332 -u workername.1 -p workerpass -t 4");
@@ -853,9 +853,9 @@ int main(int argc, char **argv)
 	GetSystemInfo( &sysinfo );
 	commandlineInput.numThreads = sysinfo.dwNumberOfProcessors;
 	commandlineInput.numThreads = max(commandlineInput.numThreads, 1);
-	commandlineInput.sieveSize = 0; // default maxSieveSize
+	commandlineInput.sieveSize = 1000000; // default maxSieveSize
 	commandlineInput.sievePercentage = 8; // default 
-	commandlineInput.sievePrimeLimit = commandlineInput.sieveSize;
+	commandlineInput.sievePrimeLimit = 0;
 	// parse command lines
 	jhMiner_parseCommandline(argc, argv);
 	// Sets max sieve size
