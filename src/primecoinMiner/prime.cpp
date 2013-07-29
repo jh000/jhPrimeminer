@@ -9,7 +9,7 @@
 
 // Prime Table
 //std::vector<unsigned int> vPrimes;
-uint32* vPrimes;
+//uint32* vPrimes;
 uint32* vPrimesTwoInverse;
 uint32 vPrimesSize = 0;
 
@@ -24,38 +24,20 @@ uint64 GetTimeMicros()
 	return (uint64)t.QuadPart;
 }
 
-//void GeneratePrimeTable()
-//{
-//	static const unsigned int nPrimeTableLimit = nMaxSieveSize;
-//	vPrimes.clear();
-//	// Generate prime table using sieve of Eratosthenes
-//	std::vector<bool> vfComposite (nPrimeTableLimit, false);
-//	for (unsigned int nFactor = 2; nFactor * nFactor < nPrimeTableLimit; nFactor++)
-//	{
-//		if (vfComposite[nFactor])
-//			continue;
-//		for (unsigned int nComposite = nFactor * nFactor; nComposite < nPrimeTableLimit; nComposite += nFactor)
-//			vfComposite[nComposite] = true;
-//	}
-//	for (unsigned int n = 2; n < nPrimeTableLimit; n++)
-//		if (!vfComposite[n])
-//			vPrimes.push_back(n);
-//	printf("GeneratePrimeTable() : prime table [1, %d] generated with %lu primes", nPrimeTableLimit, vPrimes.size());
-//	//BOOST_FOREACH(unsigned int nPrime, vPrimes)
-//	//    printf(" %u", nPrime);
-//	printf("\n");
-//}
+
+std::vector<unsigned int> vPrimes;
+std::vector<unsigned int> vTwoInverses;
+
+static unsigned int int_invert(unsigned int a, unsigned int nPrime);
+
+
 
 void GeneratePrimeTable()
 {
-	static const unsigned int nPrimeTableLimit = nMaxSieveSize;
-	//vPrimes.clear();
-	vPrimesSize = 0;
-	vPrimes = (uint32*)malloc(sizeof(uint32)*nPrimeTableLimit);
+    const unsigned nPrimeTableLimit = nMaxSieveSize ;
+    vPrimes.clear();
 	// Generate prime table using sieve of Eratosthenes
-	//std::vector<bool> vfComposite (nPrimeTableLimit, false);
-	uint8* vfComposite = (uint8*)malloc(nPrimeTableLimit);
-	RtlZeroMemory(vfComposite, nPrimeTableLimit);
+    std::vector<bool> vfComposite (nPrimeTableLimit, false);
 	for (unsigned int nFactor = 2; nFactor * nFactor < nPrimeTableLimit; nFactor++)
 	{
 		if (vfComposite[nFactor])
@@ -65,43 +47,28 @@ void GeneratePrimeTable()
 	}
 	for (unsigned int n = 2; n < nPrimeTableLimit; n++)
 		if (!vfComposite[n])
+            vPrimes.push_back(n);
+    printf("GeneratePrimeTable() : prime table [1, %d] generated with %lu primes\n", nPrimeTableLimit, vPrimes.size());
+	vPrimesSize = vPrimes.size();
+    
+    const unsigned int nPrimes = vPrimes.size();
+    vTwoInverses = std::vector<unsigned int> (nPrimes, 0);
+    for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
 		{
-			vPrimes[vPrimesSize] = n;
-			vPrimesSize++;
-			//customBuffer_add(list_primeTable, &n);//vPrimes.push_back(n);
-		}
-	printf("GeneratePrimeTable() : prime table [1, %d] generated with %lu primes", nPrimeTableLimit, vPrimesSize);
-	//BOOST_FOREACH(unsigned int nPrime, vPrimes)
-	//    printf(" %u", nPrime);
-	printf("\n");
-	free(vfComposite);
-	vPrimes = (uint32*)realloc(vPrimes, sizeof(uint32)*vPrimesSize);
-	// calculate two's inverse for all primes
-	vPrimesTwoInverse = (uint32*)malloc(sizeof(uint32)*vPrimesSize);
-	CBigNum bnTwo = 2;
-	// BN_CTX 
-	BIGNUM bn_twoInverse = {0};
-	BN_init(&bn_twoInverse);
-	BIGNUM bn_p = {0};
-	for(uint32 i=0; i<vPrimesSize; i++)
-	{
-		BN_set_word(&bn_p, vPrimes[i]);
-		if (!BN_mod_inverse(&bn_twoInverse, &bnTwo, &bn_p, pctx))
-		{
-			BN_set_word(&bn_twoInverse, 0);
-		}
-		vPrimesTwoInverse[i] = (uint32)BN_get_word(&bn_twoInverse);
+        vTwoInverses[nPrimeSeq] = int_invert(2, vPrimes[nPrimeSeq]);
 	}
 }
 
 // Get next prime number of p
-bool PrimeTableGetNextPrime(unsigned int* p)
+bool PrimeTableGetNextPrime(unsigned int& p)
 {
 	for(uint32 i=0; i<vPrimesSize; i++)
 	{
-		if (vPrimes[i] > *p)
+		unsigned int nPrime = vPrimes[i];
+
+        if ( nPrime > p)
 		{
-			*p = vPrimes[i];
+            p = nPrime;
 			return true;
 		}
 	}
@@ -109,18 +76,18 @@ bool PrimeTableGetNextPrime(unsigned int* p)
 }
 
 // Get previous prime number of p
-bool PrimeTableGetPreviousPrime(unsigned int* p)
+bool PrimeTableGetPreviousPrime(unsigned int& p)
 {
 	uint32 nPrevPrime = 0;
 	for(uint32 i=0; i<vPrimesSize; i++)
 	{
-		if (vPrimes[i] >= *p)
+		if (vPrimes[i] >= p)
 			break;
 		nPrevPrime = vPrimes[i];
 	}
 	if (nPrevPrime)
 	{
-		*p = nPrevPrime;
+		p = nPrevPrime;
 		return true;
 	}
 	return false;
@@ -153,22 +120,19 @@ void Primorial(unsigned int p, mpz_class& mpzPrimorial)
 	}
 }
 
-/*
-// Compute first primorial number greater than or equal to pn
-void PrimorialAt(CBigNum& bn, CBigNum& bnPrimorial)
+// Compute Primorial number p#
+// Fast 32-bit version assuming that p <= 23
+unsigned int PrimorialFast(unsigned int p)
 {
-	bnPrimorial = 1;
-	//BOOST_FOREACH(unsigned int nPrime, vPrimes)
-	//for(uint32 i=0; i<vPrimes.size(); i++)
+    unsigned int nPrimorial = 1;
 	for(uint32 i=0; i<vPrimesSize; i++)
 	{
 		unsigned int nPrime = vPrimes[i];
-		bnPrimorial *= nPrime;
-		if (bnPrimorial >= bn)
-			return;
+		if (nPrime > p) break;
+        nPrimorial *= nPrime;
 	}
+    return nPrimorial;
 }
-*/
 
 // Compute first primorial number greater than or equal to pn
 void PrimorialAt(mpz_class& bn, mpz_class& mpzPrimorial)
@@ -835,6 +799,11 @@ static bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPr
     // Test for Cunningham Chain of second kind
     mpzOriginPlusOne = mpzPrimeChainOrigin + 1;
     ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, fFermatTest, nChainLengthCunningham2, testParams);
+
+	// verify if there is any chance to find a biTwin that worth calculation
+	if (nChainLengthCunningham1 < 0x2000000 || nChainLengthCunningham2 < 0x2000000)
+		return (nChainLengthCunningham1 >= nBits || nChainLengthCunningham2 >= nBits);
+
     // Figure out BiTwin Chain length
     // BiTwin Chain allows a single prime at the end for odd length chain
     nChainLengthBiTwin =
@@ -917,12 +886,9 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 	if (*psieve == NULL)
 	{
 		// Build sieve
-		//uint32 nStart = GetTickCount();
-		//uint32 sieveStopTimeLimit = nStart + 2000;
-		//for(uint32 i=0; i<256/8; i++)
-		//	printf("%02x", block->blockHeaderHash.begin()[i]);
 		*psieve = new CSieveOfEratosthenes(nMaxSieveSize, block->nBits, mpzHash, mpzFixedMultiplier);
-		(*psieve)->WeaveFastAll();
+		(*psieve)->nSievePercentage = 8;
+		(*psieve)->Weave();
 	}
 
 	mpz_class mpzHashMultiplier = mpzHash * mpzFixedMultiplier;
@@ -934,7 +900,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
         nPrimorialSeq++;
 
     // Allocate GMP variables for primality tests
-    CPrimalityTestParams testParams(block->serverData.nBitsForShare, nPrimorialSeq);
+    CPrimalityTestParams testParams(block->nBits, nPrimorialSeq);
     // Compute parameters for fast div test
     {
         unsigned long lDivisor = 1;
@@ -976,7 +942,7 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 	//int nTries = 0;
 	//bool multipleShare = false;
 	
-	while ( nTests < 1500 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex))
+	while ( nTests < 1200 && block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex))
 	{
 		//nTries++;
 		nTests++;
@@ -1002,9 +968,27 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 		
 		nProbableChainLength = max(max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
 
-		
+		if (nProbableChainLength >= 0x2000000)
+		{
+			primeStats.nChainHit += pow(8, ((float)((double)nProbableChainLength  / (double)0x1000000))-7.0);
+			//primeStats.nChainHit += pow(8, floor((float)((double)nProbableChainLength  / (double)0x1000000)) - 7);
+			if (nProbableChainLength >= 0x4000000)
+			{
+				nTests = 0;
+				primeStats.fourChainCount ++;
 		if (nProbableChainLength >= 0x5000000)
+				{
 			primeStats.fiveChainCount ++;
+
+					if (nProbableChainLength >= 0x6000000)
+					{
+						primeStats.sixChainCount ++;
+						if (nProbableChainLength >= 0x7000000)
+							primeStats.sevenChainCount ++;
+					}
+				}
+			}
+		}
 		//if( nBitsGen >= 0x03000000 )
 		//	printf("%08X\n", nBitsGen);
 		primeStats.primeChainsFound++;
@@ -1038,11 +1022,22 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 			{
 				*(uint32*)(blockRawData+f*4) = _swapEndianessU32(*(uint32*)(blockRawData+f*4));
 			}
-			printf("***!!!!! Share found (@ %u - Th#: %u) -----  DIFF: %f\n", nTests, threadIndex, (float)((double)nProbableChainLength  / (double)0x1000000));
+			time_t now = time(0);
+			struct tm * timeinfo;
+			timeinfo = localtime (&now);
+			char sNow [80];
+			strftime (sNow, 80, "%x - %X",timeinfo);
+
+			float shareValue = pow(8, floor((float)((double)nProbableChainLength  / (double)0x1000000)) - 7);
+
+			printf("%s - SHARE FOUND !!! (Th#: %u) ---  DIFF: %f - VAL: %f    %s    %s\n", 
+				sNow, threadIndex, (float)((double)nProbableChainLength  / (double)0x1000000), shareValue, 
+				nProbableChainLength >= 0x6000000 ? ">6":"", nProbableChainLength >= 0x7000000 ? ">7":"");
 
 			// submit this share
 			if (jhMiner_pushShare_primecoin(blockRawData, block))
 				primeStats.foundShareCount ++;
+			primeStats.fShareValue += shareValue;
 			//printf("Probable prime chain found for block=%s!!\n  Target: %s\n  Length: (%s %s %s)\n", block.GetHash().GetHex().c_str(),TargetToString(block.nBits).c_str(), TargetToString(nChainLengthCunningham1).c_str(), TargetToString(nChainLengthCunningham2).c_str(), TargetToString(nChainLengthBiTwin).c_str());
 			//nProbableChainLength = max(max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
 			// since we are using C structs here we have to make sure the memory for the CBigNum in the block is freed again
@@ -1072,82 +1067,6 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 	return false; // stop as timed out
 }
 
-//// Check prime proof-of-work
-//bool CheckPrimeProofOfWork(uint256 hashBlockHeader, unsigned int nBits, const CBigNum& bnPrimeChainMultiplier, unsigned int& nChainType, unsigned int& nChainLength)
-//{
-//	// Check target
-//	if (TargetGetLength(nBits) < nTargetMinLength || TargetGetLength(nBits) > 99)
-//		return error("CheckPrimeProofOfWork() : invalid chain length target %s", TargetToString(nBits).c_str());
-//
-//	// Check header hash limit
-//	if (hashBlockHeader < hashBlockHeaderLimit)
-//		return error("CheckPrimeProofOfWork() : block header hash under limit");
-//	// Check target for prime proof-of-work
-//	CBigNum bnPrimeChainOrigin = CBigNum(hashBlockHeader) * bnPrimeChainMultiplier;
-//	if (bnPrimeChainOrigin < bnPrimeMin)
-//		return error("CheckPrimeProofOfWork() : prime too small");
-//	// First prime in chain must not exceed cap
-//	if (bnPrimeChainOrigin > bnPrimeMax)
-//		return error("CheckPrimeProofOfWork() : prime too big");
-//
-//	// Check prime chain
-//	unsigned int nChainLengthCunningham1 = 0;
-//	unsigned int nChainLengthCunningham2 = 0;
-//	unsigned int nChainLengthBiTwin = 0;
-//	if (!ProbablePrimeChainTest(bnPrimeChainOrigin, nBits, false, nChainLengthCunningham1, nChainLengthCunningham2, nChainLengthBiTwin))
-//		return error("CheckPrimeProofOfWork() : failed prime chain test target=%s length=(%s %s %s)", TargetToString(nBits).c_str(),
-//		TargetToString(nChainLengthCunningham1).c_str(), TargetToString(nChainLengthCunningham2).c_str(), TargetToString(nChainLengthBiTwin).c_str());
-//	if (nChainLengthCunningham1 < nBits && nChainLengthCunningham2 < nBits && nChainLengthBiTwin < nBits)
-//		return error("CheckPrimeProofOfWork() : prime chain length assert target=%s length=(%s %s %s)", TargetToString(nBits).c_str(),
-//		TargetToString(nChainLengthCunningham1).c_str(), TargetToString(nChainLengthCunningham2).c_str(), TargetToString(nChainLengthBiTwin).c_str());
-//
-//	// Double check prime chain with Fermat tests only
-//	unsigned int nChainLengthCunningham1FermatTest = 0;
-//	unsigned int nChainLengthCunningham2FermatTest = 0;
-//	unsigned int nChainLengthBiTwinFermatTest = 0;
-//	if (!ProbablePrimeChainTest(bnPrimeChainOrigin, nBits, true, nChainLengthCunningham1FermatTest, nChainLengthCunningham2FermatTest, nChainLengthBiTwinFermatTest))
-//		return error("CheckPrimeProofOfWork() : failed Fermat test target=%s length=(%s %s %s) lengthFermat=(%s %s %s)", TargetToString(nBits).c_str(),
-//		TargetToString(nChainLengthCunningham1).c_str(), TargetToString(nChainLengthCunningham2).c_str(), TargetToString(nChainLengthBiTwin).c_str(),
-//		TargetToString(nChainLengthCunningham1FermatTest).c_str(), TargetToString(nChainLengthCunningham2FermatTest).c_str(), TargetToString(nChainLengthBiTwinFermatTest).c_str());
-//	if (nChainLengthCunningham1 != nChainLengthCunningham1FermatTest ||
-//		nChainLengthCunningham2 != nChainLengthCunningham2FermatTest ||
-//		nChainLengthBiTwin != nChainLengthBiTwinFermatTest)
-//		return error("CheckPrimeProofOfWork() : failed Fermat-only double check target=%s length=(%s %s %s) lengthFermat=(%s %s %s)", TargetToString(nBits).c_str(), 
-//		TargetToString(nChainLengthCunningham1).c_str(), TargetToString(nChainLengthCunningham2).c_str(), TargetToString(nChainLengthBiTwin).c_str(),
-//		TargetToString(nChainLengthCunningham1FermatTest).c_str(), TargetToString(nChainLengthCunningham2FermatTest).c_str(), TargetToString(nChainLengthBiTwinFermatTest).c_str());
-//
-//	// Select the longest primechain from the three chain types
-//	nChainLength = nChainLengthCunningham1;
-//	nChainType = PRIME_CHAIN_CUNNINGHAM1;
-//	if (nChainLengthCunningham2 > nChainLength)
-//	{
-//		nChainLength = nChainLengthCunningham2;
-//		nChainType = PRIME_CHAIN_CUNNINGHAM2;
-//	}
-//	if (nChainLengthBiTwin > nChainLength)
-//	{
-//		nChainLength = nChainLengthBiTwin;
-//		nChainType = PRIME_CHAIN_BI_TWIN;
-//	}
-//
-//	// Check that the certificate (bnPrimeChainMultiplier) is normalized
-//	if (bnPrimeChainMultiplier % 2 == 0 && bnPrimeChainOrigin % 4 == 0)
-//	{
-//		unsigned int nChainLengthCunningham1Extended = 0;
-//		unsigned int nChainLengthCunningham2Extended = 0;
-//		unsigned int nChainLengthBiTwinExtended = 0;
-//		if (ProbablePrimeChainTest(bnPrimeChainOrigin / 2, nBits, false, nChainLengthCunningham1Extended, nChainLengthCunningham2Extended, nChainLengthBiTwinExtended))
-//		{ // try extending down the primechain with a halved multiplier
-//			if (nChainLengthCunningham1Extended > nChainLength || nChainLengthCunningham2Extended > nChainLength || nChainLengthBiTwinExtended > nChainLength)
-//				return error("CheckPrimeProofOfWork() : prime certificate not normalzied target=%s length=(%s %s %s) extend=(%s %s %s)",
-//				TargetToString(nBits).c_str(),
-//				TargetToString(nChainLengthCunningham1).c_str(), TargetToString(nChainLengthCunningham2).c_str(), TargetToString(nChainLengthBiTwin).c_str(),
-//				TargetToString(nChainLengthCunningham1Extended).c_str(), TargetToString(nChainLengthCunningham2Extended).c_str(), TargetToString(nChainLengthBiTwinExtended).c_str());
-//		}
-//	}
-//
-//	return true;
-//}
 
 // prime target difficulty value for visualization
 double GetPrimeDifficulty(unsigned int nBits)
@@ -1179,6 +1098,7 @@ unsigned int EstimateWorkTransition(unsigned int nPrevWorkTransition, unsigned i
 //	return strprintf("%s%s", (nChainType==PRIME_CHAIN_CUNNINGHAM1)? "1CC" : ((nChainType==PRIME_CHAIN_CUNNINGHAM2)? "2CC" : "TWN"), TargetToString(nChainLength).c_str());
 //}
 
+/*
 // Weave sieve for the next prime in table
 // Return values:
 //   True  - weaved another prime; nComposite - number of composites removed
@@ -1228,222 +1148,9 @@ bool CSieveOfEratosthenes::WeaveOriginal()
 	//delete[] p;
 	return true;
 }
-
-//bool CSieveOfEratosthenes::WeaveFast()
-//{
-//	if (nPrimeSeq >= vPrimesSize || vPrimes[nPrimeSeq] >= nSieveSize)
-//		return false;  // sieve has been completed
-//	CBigNum p = vPrimes[nPrimeSeq];
-//	if (bnFixedFactor % p == 0)
-//	{
-//		// Nothing in the sieve is divisible by this prime
-//		nPrimeSeq++;
-//		return true;
-//	}
-//	// Find the modulo inverse of fixed factor
-//	CBigNum bnFixedInverse;
-//	if (!BN_mod_inverse(&bnFixedInverse, &bnFixedFactor, &p, pctx))
-//		return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-//	CBigNum bnTwo = 2;
-//	CBigNum bnTwoInverse;
-//	if (!BN_mod_inverse(&bnTwoInverse, &bnTwo, &p, pctx))
-//		return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-//
-//	// Weave the sieve for the prime
-//	unsigned int nChainLength = TargetGetLength(nBits);
-//
-//	uint64 bnFixedInverseU64 = bnFixedInverse.getuint();
-//	uint64 pU64 = bnFixedInverse.getuint();
-//	uint64 bnTwoInverseU64 = bnTwoInverse.getuint();
-//
-//	if( bnFixedInverse > CBigNum(0xFFFFFFFFULL) )
-//		__debugbreak();
-//	if( pU64 > CBigNum(0xFFFFFFFFULL) )
-//		__debugbreak();
-//	if( bnTwoInverse > CBigNum(0xFFFFFFFFULL) )
-//		__debugbreak();
-//
-//	for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
-//	{
-//		// Find the first number that's divisible by this prime
-//		int nDelta = ((nBiTwinSeq % 2 == 0)? (-1) : 1);
-//		//unsigned int nSolvedMultiplier = ((bnFixedInverse * (p - nDelta)) % p).getuint();
-//		unsigned int nSolvedMultiplierX = ((bnFixedInverseU64 * (pU64 - nDelta)) % pU64);
-//		unsigned int nSolvedMultiplier = (((bnFixedInverseU64%pU64) * ((pU64 - nDelta)%pU64)) % pU64);
-//		if( nSolvedMultiplier != nSolvedMultiplierX )
-//			__debugbreak();
-//		if (nBiTwinSeq % 2 == 1)
-//		{
-//			uint64 backupX = bnFixedInverseU64;
-//
-//			bnFixedInverseU64 *= bnTwoInverseU64;//bnFixedInverse *= bnTwoInverse; // for next number in chain
-//			if( bnFixedInverseU64 >= 0) //0x0000F00000000000ULL ) //(bnFixedInverseU64 / bnTwoInverseU64) != backupX )//bnFixedInverseU64 < backupX )
-//			{
-//				bnFixedInverseU64 = backupX;
-//				// overflow occured, continue with big numbers
-//				//__debugbreak();
-//				// update the big integers (not all need updating, check later)
-//				bnFixedInverse.setuint64(bnFixedInverseU64);
-//				p.setuint64(pU64);
-//				bnTwoInverse.setuint64(bnTwoInverseU64);
-//				// finish current loop in bignum mode
-//				bnFixedInverse *= bnTwoInverse;
-//				unsigned int nPrime = vPrimes[nPrimeSeq];
-//				if (nBiTwinSeq < nChainLength)
-//					for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//						vfCompositeBiTwin[nVariableMultiplier] = true;
-//				if (((nBiTwinSeq & 1u) == 0))
-//					for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//						vfCompositeCunningham1[nVariableMultiplier] = true;
-//				if (((nBiTwinSeq & 1u) == 1u))
-//					for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//						vfCompositeCunningham2[nVariableMultiplier] = true;
-//				nBiTwinSeq++;
-//				// continue loop in bignum mode
-//				for (;nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
-//				{
-//					int nDelta = ((nBiTwinSeq % 2 == 0)? (-1) : 1);
-//					unsigned int nSolvedMultiplier = ((bnFixedInverse * (p - nDelta)) % p).getuint();
-//					if (nBiTwinSeq % 2 == 1)
-//						bnFixedInverse *= bnTwoInverse;
-//					unsigned int nPrime = vPrimes[nPrimeSeq];
-//					if (nBiTwinSeq < nChainLength)
-//						for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//							vfCompositeBiTwin[nVariableMultiplier] = true;
-//					if (((nBiTwinSeq & 1u) == 0))
-//						for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//							vfCompositeCunningham1[nVariableMultiplier] = true;
-//					if (((nBiTwinSeq & 1u) == 1u))
-//						for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//							vfCompositeCunningham2[nVariableMultiplier] = true;
-//				}
-//
-//				nPrimeSeq++;
-//				return true;
-//
-//				//__debugbreak();
-//			}
-//		}
-//
-//		unsigned int nPrime = vPrimes[nPrimeSeq];
-//		if (nBiTwinSeq < nChainLength)
-//			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//				vfCompositeBiTwin[nVariableMultiplier] = true;
-//		if (((nBiTwinSeq & 1u) == 0))
-//			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//				vfCompositeCunningham1[nVariableMultiplier] = true;
-//		if (((nBiTwinSeq & 1u) == 1u))
-//			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//				vfCompositeCunningham2[nVariableMultiplier] = true;
-//	}
-//	nPrimeSeq++;
-//	return true;
-//}
+*/
 
 
-//
-//// Weave sieve for the next prime in table
-//// Return values:
-////   True  - weaved another prime; nComposite - number of composites removed
-////   False - sieve already completed
-//bool CSieveOfEratosthenes::WeaveFast2()
-//{
-//	if (nPrimeSeq >= vPrimesSize || vPrimes[nPrimeSeq] >= nSieveSize)
-//		return false;  // sieve has been completed
-//	//CBigNum p = vPrimes[nPrimeSeq];
-//	// init some required bignums on the stack (no dynamic allocation at all)
-//	BIGNUM bn_p;
-//	BIGNUM bn_tmp;
-//	BIGNUM bn_fixedInverse;
-//	BIGNUM bn_twoInverse;
-//	//BIGNUM bn_delta;
-//	uint32 bignumData_p[0x200/4];
-//	uint32 bignumData_tmp[0x200/4];
-//	uint32 bignumData_fixedInverse[0x200/4];
-//	uint32 bignumData_twoInverse[0x200/4];
-//	//uint32 bignumData_delta[0x200/4];
-//	fastInitBignum(bn_p, bignumData_p);
-//	fastInitBignum(bn_tmp, bignumData_tmp);
-//	fastInitBignum(bn_fixedInverse, bignumData_fixedInverse);
-//	fastInitBignum(bn_twoInverse, bignumData_twoInverse);
-//	//fastInitBignum(bn_delta, bignumData_delta);
-//	BN_set_word(&bn_p, vPrimes[nPrimeSeq]);
-//	BN_mod(&bn_tmp, &bnFixedFactor, &bn_p, pctx);
-//
-//	
-//	//if (bnFixedFactor % p == 0)
-//	if( BN_is_zero(&bn_tmp) )
-//	{
-//		// Nothing in the sieve is divisible by this prime
-//		nPrimeSeq++;
-//		return true;
-//	}
-//
-//	//CBigNum p = CBigNum(vPrimes[nPrimeSeq]);
-//	// debug: Code is correct until here
-//
-//	// Find the modulo inverse of fixed factor
-//	if (!BN_mod_inverse(&bn_fixedInverse, &bnFixedFactor, &bn_p, pctx))
-//		return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-//	//CBigNum bnTwo = 2;
-//	if (!BN_mod_inverse(&bn_twoInverse, &bn_constTwo, &bn_p, pctx))
-//		return error("CSieveOfEratosthenes::Weave(): BN_mod_inverse of 2 failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
-//
-//	// Weave the sieve for the prime
-//	unsigned int nChainLength = TargetGetLength(nBits);
-//	for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 2 * nChainLength; nBiTwinSeq++)
-//	{
-//		// Find the first number that's divisible by this prime
-//		//int nDelta = (((nBiTwinSeq&1) == 0)? (-1) : 1);
-//		//unsigned int nSolvedMultiplier = ((bnFixedInverse * (p - nDelta)) % p).getuint();
-//		//if (nBiTwinSeq % 2 == 1)
-//		//	bnFixedInverse *= bnTwoInverse; // for next number in chain
-//
-//		/*if( nDelta > 0 )
-//			BN_set_word(&bn_delta, nDelta);
-//		else
-//		{
-//			BN_set_word(&bn_delta, -nDelta);
-//			bn_delta.neg = 1;
-//		}*/
-//
-//		//unsigned int nSolvedMultiplier = ((bnFixedInverse * (p - nDelta)) % p).getuint();
-//		//if (nBiTwinSeq % 2 == 1)
-//		//	bnFixedInverse *= bnTwoInverse; // for next number in chain
-//
-//		// maybe just use this method below: BN_sub_word() (since delta is actually a word)
-//		//BN_sub(&bn_tmp, &bn_p, &bn_delta);
-//		BN_copy(&bn_tmp, &bn_p);
-//		if( (nBiTwinSeq&1) == 0 )
-//			BN_add_word(&bn_tmp, 1);
-//		else
-//			BN_sub_word(&bn_tmp, 1);		
-//		BN_mul(&bn_tmp, &bn_fixedInverse, &bn_tmp, pctx);
-//		BN_mod(&bn_tmp, &bn_tmp, &bn_p, pctx);
-//		unsigned int nSolvedMultiplier = BN_get_word(&bn_tmp);
-//
-//		if ((nBiTwinSeq & 1) == 1)
-//			BN_mul(&bn_fixedInverse, &bn_fixedInverse, &bn_twoInverse, pctx);
-//
-//		//unsigned int nSolvedMultiplier = ((bnFixedInverse * (p - nDelta)) % p).getuint();
-//		//if (nBiTwinSeq % 2 == 1)
-//		//	bnFixedInverse *= bnTwoInverse; // for next number in chain
-//
-//
-//		unsigned int nPrime = vPrimes[nPrimeSeq];
-//		if (nBiTwinSeq < nChainLength)
-//			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//				vfCompositeBiTwin[nVariableMultiplier] = true;
-//		if (((nBiTwinSeq & 1u) == 0))
-//			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//				vfCompositeCunningham1[nVariableMultiplier] = true;
-//		if (((nBiTwinSeq & 1u) == 1u))
-//			for (unsigned int nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
-//				vfCompositeCunningham2[nVariableMultiplier] = true;
-//	}
-//	nPrimeSeq++;
-//	return true;
-//}
 
 /* akruppa's code */
 int single_modinv (int a, int modulus)
@@ -1510,7 +1217,7 @@ int single_modinv (int a, int modulus)
 		return (modulus - ps1);
 } /* end of single_modinv */
 
-
+/*
 // Weave sieve for the next prime in table
 // Return values:
 //   True  - weaved another prime; nComposite - number of composites removed
@@ -1627,7 +1334,9 @@ bool CSieveOfEratosthenes::WeaveFastAllBN()
 	}
 	return false; // never reached
 }
+*/
 
+/*
 // Weave sieve for the next prime in table
 // Return values:
 //   True  - weaved another prime; nComposite - number of composites removed
@@ -1645,7 +1354,7 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 
     // Process only 10% of the primes
     // Most composites are still found
-    vPrimesSize2 = (uint64)vPrimesSize2 *8 / 100;
+    vPrimesSize2 = (uint64)vPrimesSize2 *nSievePercentage / 100;
 
 	
     mpz_t mpzFixedFactor; // fixed factor to derive the chain
@@ -1745,3 +1454,237 @@ bool CSieveOfEratosthenes::WeaveFastAll()
 
 	return false; // never reached
 }
+*/
+
+static unsigned int int_invert(unsigned int a, unsigned int nPrime)
+{
+    // Extended Euclidean algorithm to calculate the inverse of a in finite field defined by nPrime
+    int rem0 = nPrime, rem1 = a % nPrime, rem2;
+    int aux0 = 0, aux1 = 1, aux2;
+    int quotient, inverse;
+
+    while (1)
+    {
+        if (rem1 <= 1)
+        {
+            inverse = aux1;
+            break;
+        }
+
+        rem2 = rem0 % rem1;
+        quotient = rem0 / rem1;
+        aux2 = -quotient * aux1 + aux0;
+
+        if (rem2 <= 1)
+        {
+            inverse = aux2;
+            break;
+        }
+
+        rem0 = rem1 % rem2;
+        quotient = rem1 / rem2;
+        aux0 = -quotient * aux2 + aux1;
+
+        if (rem0 <= 1)
+        {
+            inverse = aux0;
+            break;
+        }
+
+        rem1 = rem2 % rem0;
+        quotient = rem2 / rem0;
+        aux1 = -quotient * aux0 + aux2;
+    }
+
+    return (inverse + nPrime) % nPrime;
+}
+
+void CSieveOfEratosthenes::AddMultiplier(unsigned int *vMultipliers, const unsigned int nPrimeSeq, const unsigned int nSolvedMultiplier)
+{
+    // Eliminate duplicates
+    for (unsigned int i = 0; i < nHalfChainLength; i++)
+    {
+        unsigned int nStoredMultiplier = vMultipliers[nPrimeSeq * nHalfChainLength + i];
+        if (nStoredMultiplier == 0xFFFFFFFF || nStoredMultiplier == nSolvedMultiplier)
+        {
+            vMultipliers[nPrimeSeq * nHalfChainLength + i] = nSolvedMultiplier;
+            break;
+        }
+    }
+}
+
+
+// Weave sieve for the next prime in table
+// Return values:
+//   True  - weaved another prime; nComposite - number of composites removed
+//   False - sieve already completed
+bool CSieveOfEratosthenes::Weave()
+{
+    // Faster GMP version
+ 
+    // Keep all variables local for max performance
+    const unsigned int nChainLength = this->nChainLength;
+    const unsigned int nDoubleChainLength = this->nChainLength * 2;
+
+    const unsigned int nHalfChainLength = this->nHalfChainLength;
+//    CBlockIndex* pindexPrev = this->pindexPrev;
+    const unsigned int nSieveSize = this->nSieveSize;
+    const unsigned int nTotalPrimes = vPrimes.size();
+	const unsigned int nTotalPrimesLessOne = nTotalPrimes-1;
+    mpz_class mpzHash = this->mpzHash;
+    mpz_class mpzFixedMultiplier = this->mpzFixedMultiplier;
+
+    // Process only a set percentage of the primes
+    // Most composites are still found
+    const unsigned int nPrimes = (uint64)nTotalPrimes * nSievePercentage / 100;
+    this->nPrimes = nPrimes;
+
+    const unsigned int nMultiplierBytes = nPrimes * nHalfChainLength * sizeof(unsigned int);
+    unsigned int *vCunningham1AMultipliers = (unsigned int *)malloc(nMultiplierBytes);
+    unsigned int *vCunningham1BMultipliers = (unsigned int *)malloc(nMultiplierBytes);
+    unsigned int *vCunningham2AMultipliers = (unsigned int *)malloc(nMultiplierBytes);
+    unsigned int *vCunningham2BMultipliers = (unsigned int *)malloc(nMultiplierBytes);
+
+    memset(vCunningham1AMultipliers, 0xFF, nMultiplierBytes);
+    memset(vCunningham1BMultipliers, 0xFF, nMultiplierBytes);
+    memset(vCunningham2AMultipliers, 0xFF, nMultiplierBytes);
+    memset(vCunningham2BMultipliers, 0xFF, nMultiplierBytes);
+
+    // bitsets that can be combined to obtain the final bitset of candidates
+    unsigned long *vfCompositeCunningham1A = (unsigned long *)malloc(nCandidatesBytes);
+    unsigned long *vfCompositeCunningham1B = (unsigned long *)malloc(nCandidatesBytes);
+    unsigned long *vfCompositeCunningham2A = (unsigned long *)malloc(nCandidatesBytes);
+    unsigned long *vfCompositeCunningham2B = (unsigned long *)malloc(nCandidatesBytes);
+
+    unsigned long *vfCandidates = this->vfCandidates;
+
+    // Check whether fixed multiplier fits in an unsigned long
+    bool fUseLongForFixedMultiplier = mpzFixedMultiplier < ULONG_MAX;
+    unsigned long nFixedMultiplier;
+    mpz_class mpzFixedFactor;
+    if (fUseLongForFixedMultiplier)
+        nFixedMultiplier = mpzFixedMultiplier.get_ui();
+    else
+        mpzFixedFactor = mpzHash * mpzFixedMultiplier;
+
+    unsigned int nCombinedEndSeq = 1;
+    unsigned int nFixedFactorCombinedMod = 0;
+
+    for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
+    {
+		// TODO: on new block stop
+        //if (pindexPrev != pindexBest)
+        //    break;  // new block
+        unsigned int nPrime = vPrimes[nPrimeSeq];
+        if (nPrimeSeq >= nCombinedEndSeq)
+        {
+            // Combine multiple primes to produce a big divisor
+            unsigned int nPrimeCombined = 1;
+            while (nPrimeCombined < UINT_MAX / vPrimes[nCombinedEndSeq] && nCombinedEndSeq < nTotalPrimesLessOne )
+            {
+                nPrimeCombined *= vPrimes[nCombinedEndSeq];
+                nCombinedEndSeq++;
+            }
+
+            if (fUseLongForFixedMultiplier)
+            {
+                nFixedFactorCombinedMod = mpz_tdiv_ui(mpzHash.get_mpz_t(), nPrimeCombined);
+                nFixedFactorCombinedMod = (uint64)nFixedFactorCombinedMod * (nFixedMultiplier % nPrimeCombined) % nPrimeCombined;
+            }
+            else
+                nFixedFactorCombinedMod = mpz_tdiv_ui(mpzFixedFactor.get_mpz_t(), nPrimeCombined);
+        }
+
+        unsigned int nFixedFactorMod = nFixedFactorCombinedMod % nPrime;
+        if (nFixedFactorMod == 0)
+        {
+            // Nothing in the sieve is divisible by this prime
+            continue;
+        }
+        // Find the modulo inverse of fixed factor
+        unsigned int nFixedInverse = int_invert(nFixedFactorMod, nPrime);
+        if (!nFixedInverse)
+            return error("CSieveOfEratosthenes::Weave(): int_invert of fixed factor failed for prime #%u=%u", nPrimeSeq, vPrimes[nPrimeSeq]);
+        unsigned int nTwoInverse = vTwoInverses[nPrimeSeq];
+
+        // Weave the sieve for the prime
+        for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < nDoubleChainLength; nBiTwinSeq++)
+        {
+            // Find the first number that's divisible by this prime
+            int nDelta = ((nBiTwinSeq % 2 == 0)? (-1) : 1);
+            unsigned int nSolvedMultiplier = (uint64)nFixedInverse * (nPrime - nDelta) % nPrime;
+            if (nBiTwinSeq % 2 == 1)
+                nFixedInverse = (uint64)nFixedInverse * nTwoInverse % nPrime;
+
+            if (nBiTwinSeq < nChainLength)
+            {
+                if (((nBiTwinSeq & 1u) == 0))
+                    AddMultiplier(vCunningham1AMultipliers, nPrimeSeq, nSolvedMultiplier);
+                else
+                    AddMultiplier(vCunningham2AMultipliers, nPrimeSeq, nSolvedMultiplier);
+            } else {
+                if (((nBiTwinSeq & 1u) == 0))
+                    AddMultiplier(vCunningham1BMultipliers, nPrimeSeq, nSolvedMultiplier);
+                else
+                    AddMultiplier(vCunningham2BMultipliers, nPrimeSeq, nSolvedMultiplier);
+            }
+        }
+    }
+
+    // Number of elements that are likely to fit in L1 cache
+    const unsigned int nL1CacheElements = 200000;
+    const unsigned int nArrayRounds = (nSieveSize + nL1CacheElements - 1) / nL1CacheElements;
+
+    // Loop over each array one at a time for optimal L1 cache performance
+    for (unsigned int j = 0; j < nArrayRounds; j++)
+    {
+        const unsigned int nMinMultiplier = nL1CacheElements * j;
+        const unsigned int nMaxMultiplier = min(nL1CacheElements * (j + 1), nSieveSize);
+
+		//TODO: stop on new block
+		//if (pindexPrev != pindexBest)
+        //    break;  // new block
+
+        ProcessMultiplier(vfCompositeCunningham1A, nMinMultiplier, nMaxMultiplier, vPrimes, vCunningham1AMultipliers);
+        ProcessMultiplier(vfCompositeCunningham1B, nMinMultiplier, nMaxMultiplier, vPrimes, vCunningham1BMultipliers);
+        ProcessMultiplier(vfCompositeCunningham2A, nMinMultiplier, nMaxMultiplier, vPrimes, vCunningham2AMultipliers);
+        ProcessMultiplier(vfCompositeCunningham2B, nMinMultiplier, nMaxMultiplier, vPrimes, vCunningham2BMultipliers);
+
+        // Combine all the bitsets
+        // vfCompositeCunningham1 = vfCompositeCunningham1A | vfCompositeCunningham1B
+        // vfCompositeCunningham2 = vfCompositeCunningham2A | vfCompositeCunningham2B
+        // vfCompositeBiTwin = vfCompositeCunningham1A | vfCompositeCunningham2A
+        // vfCandidates = ~(vfCompositeCunningham1 & vfCompositeCunningham2 & vfCompositeBiTwin)
+        {
+            // Fast version
+            const unsigned int nBytes = (nMaxMultiplier - nMinMultiplier + 7) / 8;
+            unsigned long *lCandidates = (unsigned long *)vfCandidates + (nMinMultiplier / nWordBits);
+            unsigned long *lCompositeCunningham1A = (unsigned long *)vfCompositeCunningham1A + (nMinMultiplier / nWordBits);
+            unsigned long *lCompositeCunningham1B = (unsigned long *)vfCompositeCunningham1B + (nMinMultiplier / nWordBits);
+            unsigned long *lCompositeCunningham2A = (unsigned long *)vfCompositeCunningham2A + (nMinMultiplier / nWordBits);
+            unsigned long *lCompositeCunningham2B = (unsigned long *)vfCompositeCunningham2B + (nMinMultiplier / nWordBits);
+            const unsigned int nLongs = (nBytes + sizeof(unsigned long) - 1) / sizeof(unsigned long);
+            for (unsigned int i = 0; i < nLongs; i++)
+            {
+                lCandidates[i] = ~((lCompositeCunningham1A[i] | lCompositeCunningham1B[i]) &
+                                (lCompositeCunningham2A[i] | lCompositeCunningham2B[i]) &
+                                (lCompositeCunningham1A[i] | lCompositeCunningham2A[i]));
+            }
+        }
+    }
+
+    this->nPrimeSeq = nPrimes - 1;
+
+    free(vfCompositeCunningham1A);
+    free(vfCompositeCunningham1B);
+    free(vfCompositeCunningham2A);
+    free(vfCompositeCunningham2B);
+    
+    free(vCunningham1AMultipliers);
+    free(vCunningham1BMultipliers);
+    free(vCunningham2AMultipliers);
+    free(vCunningham2BMultipliers);
+
+    return false;
+}
+

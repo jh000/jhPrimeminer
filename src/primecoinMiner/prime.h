@@ -5,6 +5,10 @@
 #ifndef PRIMECOIN_PRIME_H
 #define PRIMECOIN_PRIME_H
 
+#if defined(__i386__) || defined(_M_IX86) || defined(_X86_) || defined(__x86_64__) || defined(_M_X64)
+#define USE_ROTATE
+#endif
+
 //#include "main.h"
 #include "mpirxx.h"
 
@@ -32,13 +36,15 @@ extern unsigned int nTargetMinLength;
 // Generate small prime table
 void GeneratePrimeTable();
 // Get next prime number of p
-bool PrimeTableGetNextPrime(unsigned int* p);
+//bool PrimeTableGetNextPrime(unsigned int* p);
+bool PrimeTableGetNextPrime(unsigned int& p);
 // Get previous prime number of p
-bool PrimeTableGetPreviousPrime(unsigned int* p);
+bool PrimeTableGetPreviousPrime(unsigned int& p);
 
 // Compute primorial number p#
 void BNPrimorial(unsigned int p, CBigNum& bnPrimorial);
 void Primorial(unsigned int p, mpz_class& mpzPrimorial);
+unsigned int PrimorialFast(unsigned int p);
 // Compute the first primorial number greater than or equal to bn
 //void PrimorialAt(CBigNum& bn, CBigNum& bnPrimorial);
 void PrimorialAt(mpz_class& bn, mpz_class& mpzPrimorial);
@@ -93,6 +99,7 @@ unsigned int EstimateWorkTransition(unsigned int nPrevWorkTransition, unsigned i
 // prime chain type and length value
 std::string GetPrimeChainName(unsigned int nChainType, unsigned int nChainLength);
 
+/*
 // Sieve of Eratosthenes for proof-of-work mining
 class CSieveOfEratosthenes
 {
@@ -122,6 +129,7 @@ public:
 	//bool* vfCompositeCunningham1;
 	//bool* vfCompositeCunningham2;
 	//bool* vfCompositeBiTwin;
+	unsigned int nSievePercentage;
 
 	uint8* vfCompositeCunningham1;
 	uint8* vfCompositeCunningham2;
@@ -150,7 +158,7 @@ public:
 		//bn_constTwo.neg = 0; 
 		//bn_constTwo.top = 1; 
 		//BN_set_word(&bn_constTwo, 2);
-
+		nSievePercentage = 10;
 	}
 
 
@@ -217,6 +225,178 @@ public:
 	bool WeaveFastAll();
 
 	// bool WeaveAlt();
+};
+
+*/
+
+	// Sieve of Eratosthenes for proof-of-work mining
+class CSieveOfEratosthenes
+{
+    unsigned int nSieveSize; // size of the sieve
+    unsigned int nBits; // target of the prime chain to search for
+    mpz_class mpzHash; // hash of the block header
+    mpz_class mpzFixedMultiplier; // fixed round multiplier
+
+    // final set of candidates for probable primality checking
+    unsigned long *vfCandidates;
+    
+    static const unsigned int nWordBits = 8 * sizeof(unsigned long);
+    unsigned int nCandidatesWords;
+    unsigned int nCandidatesBytes;
+
+    unsigned int nPrimeSeq; // prime sequence number currently being processed
+    unsigned int nCandidateCount; // cached total count of candidates
+    unsigned int nCandidateMultiplier; // current candidate for power test
+    
+    unsigned int nChainLength;
+    unsigned int nHalfChainLength;
+    unsigned int nPrimes;
+    
+    //CBlockIndex* pindexPrev;
+    
+    unsigned int GetWordNum(unsigned int nBitNum) {
+        return nBitNum / nWordBits;
+    }
+    
+    unsigned long GetBitMask(unsigned int nBitNum) {
+        return 1UL << (nBitNum % nWordBits);
+    }
+    
+    void AddMultiplier(unsigned int *vMultipliers, const unsigned int nPrimeSeq, const unsigned int nSolvedMultiplier);
+
+    void ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const std::vector<unsigned int>& vPrimes, unsigned int *vMultipliers)
+    {
+        // Wipe the part of the array first
+        memset(vfComposites + GetWordNum(nMinMultiplier), 0, (nMaxMultiplier - nMinMultiplier + nWordBits - 1) / nWordBits * sizeof(unsigned long));
+
+        for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
+        {
+            const unsigned int nPrime = vPrimes[nPrimeSeq];
+#ifdef USE_ROTATE
+            const unsigned int nRotateBits = nPrime % nWordBits;
+            for (unsigned int i = 0; i < nHalfChainLength; i++)
+            {
+                unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nHalfChainLength + i];
+                if (nVariableMultiplier == 0xFFFFFFFF) break;
+                unsigned long lBitMask = GetBitMask(nVariableMultiplier);
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                {
+                    vfComposites[GetWordNum(nVariableMultiplier)] |= lBitMask;
+                    lBitMask = (lBitMask << nRotateBits) | (lBitMask >> (nWordBits - nRotateBits));
+                }
+                vMultipliers[nPrimeSeq * nHalfChainLength + i] = nVariableMultiplier;
+            }
+#else
+            for (unsigned int i = 0; i < nHalfChainLength; i++)
+            {
+                unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nHalfChainLength + i];
+                if (nVariableMultiplier == 0xFFFFFFFF) break;
+                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+                {
+                    vfComposites[GetWordNum(nVariableMultiplier)] |= GetBitMask(nVariableMultiplier);
+                }
+                vMultipliers[nPrimeSeq * nHalfChainLength + i] = nVariableMultiplier;
+            }
+#endif
+        }
+    }
+
+public:
+
+	unsigned int nSievePercentage;
+
+    CSieveOfEratosthenes(unsigned int nSieveSize, unsigned int nBits, mpz_class& mpzHash, mpz_class& mpzFixedMultiplier)
+    {
+        this->nSieveSize = nSieveSize;
+        this->nBits = nBits;
+        this->mpzHash = mpzHash;
+        this->mpzFixedMultiplier = mpzFixedMultiplier;
+        //this->pindexPrev = pindexPrev;
+        nPrimeSeq = 0;
+        nCandidateCount = 0;
+        nCandidateMultiplier = 0;
+        nCandidatesWords = (nSieveSize + nWordBits - 1) / nWordBits;
+        nCandidatesBytes = nCandidatesWords * sizeof(unsigned long);
+        vfCandidates = (unsigned long *)malloc(nCandidatesBytes);
+        memset(vfCandidates, 0, nCandidatesBytes);
+		nSievePercentage = 16;
+		this->nChainLength = TargetGetLength(nBits);
+		this->nHalfChainLength = (nChainLength + 1) / 2;
+    }
+    
+    ~CSieveOfEratosthenes()
+    {
+        free(vfCandidates);
+    }
+
+    // Get total number of candidates for power test
+    unsigned int GetCandidateCount()
+    {
+        if (nCandidateCount)
+            return nCandidateCount;
+
+        unsigned int nCandidates = 0;
+#ifdef __GNUC__
+        for (unsigned int i = 0; i < nCandidatesWords; i++)
+        {
+            nCandidates += __builtin_popcountl(vfCandidates[i]);
+        }
+#else
+        for (unsigned int i = 0; i < nCandidatesWords; i++)
+        {
+            unsigned long lBits = vfCandidates[i];
+            for (unsigned int j = 0; j < nWordBits; j++)
+            {
+                nCandidates += (lBits & 1UL);
+                lBits >>= 1;
+            }
+        }
+#endif
+        nCandidateCount = nCandidates;
+        return nCandidates;
+    }
+
+    // Scan for the next candidate multiplier (variable part)
+    // Return values:
+    //   True - found next candidate; nVariableMultiplier has the candidate
+    //   False - scan complete, no more candidate and reset scan
+    bool GetNextCandidateMultiplier(unsigned int& nVariableMultiplier)
+    {
+        unsigned long lBits = vfCandidates[GetWordNum(nCandidateMultiplier)];
+        for(;;)
+        {
+            nCandidateMultiplier++;
+            if (nCandidateMultiplier >= nSieveSize)
+            {
+                nCandidateMultiplier = 0;
+                return false;
+            }
+            if (nCandidateMultiplier % nWordBits == 0)
+            {
+                lBits = vfCandidates[GetWordNum(nCandidateMultiplier)];
+                if (lBits == 0)
+                {
+                    // Skip an entire word
+                    nCandidateMultiplier += nWordBits - 1;
+                    continue;
+                }
+            }
+            if (lBits & GetBitMask(nCandidateMultiplier))
+            {
+                nVariableMultiplier = nCandidateMultiplier;
+                return true;
+            }
+        }
+    }
+
+    // Get progress percentage of the sieve
+    unsigned int GetProgressPercentage();
+
+    // Weave the sieve for the next prime in table
+    // Return values:
+    //   True  - weaved another prime; nComposite - number of composites removed
+    //   False - sieve already completed
+    bool Weave();
 };
 
 inline void mpz_set_uint256(mpz_t r, uint256& u)

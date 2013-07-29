@@ -107,8 +107,8 @@ bool xptClient_processPacket_shareAck(xptClient_t* xptClient)
 		valid_shares++;
 		time_t now = time(0);
 		char* dt = ctime(&now);
-		printf("Valid share found!");
-		printf("[ %d / %d ] %s",valid_shares, total_shares,dt);
+		//printf("Valid share found!");
+		//printf("[ %d / %d ] %s",valid_shares, total_shares,dt);
 	}
 	else
 	{

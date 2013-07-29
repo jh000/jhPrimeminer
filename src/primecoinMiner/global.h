@@ -106,10 +106,18 @@ typedef struct
 {
 	volatile uint32 primeChainsFound;
 	volatile uint32 foundShareCount;
+	volatile float fShareValue;
+	volatile uint32 fourChainCount;
 	volatile uint32 fiveChainCount;
+	volatile uint32 sixChainCount;
+	volatile uint32 sevenChainCount;	
 	volatile uint32 cunningham1Count;
 	volatile uint32 cunningham2Count;
 	volatile uint32 cunninghamBiTwinCount;
+	volatile float nChainHit;
+	volatile float nPrevChainHit;
+	volatile unsigned int nPrimorialMultiplier;
+	CRITICAL_SECTION cs;
 
 	// since we can generate many (useless) primes ultra fast if we simply set sieve size low, 
 	// its better if we only count primes with at least a given difficulty

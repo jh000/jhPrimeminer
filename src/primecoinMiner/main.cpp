@@ -238,8 +238,8 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 				valid_shares++;
 				time_t now = time(0);
 				dt = ctime(&now);
-				printf("Valid share found!");
-				printf("[ %d / %d ] %s",valid_shares, total_shares,dt);
+				//printf("Valid share found!");
+				//printf("[ %d / %d ] %s",valid_shares, total_shares,dt);
 				jsonObject_freeObject(jsonReturnValue);
 				return true;
 			}
@@ -649,6 +649,36 @@ int jhMiner_main_getworkMode()
 	return 0;
 }
 
+bool fIncrementPrimorial = true;
+void MultiplierAutoAdjust()
+{
+	//printf("\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\n");
+	//printf( "ChainHit:  %f - PrevChainHit: %f - PrimorialMultiplier: %u\n", primeStats.nChainHit, primeStats.nPrevChainHit, primeStats.nPrimorialMultiplier);
+	//printf("\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\n");
+
+	//bool fIncrementPrimorial = true;
+	if (primeStats.nChainHit == 0)
+		return;
+
+	if ( primeStats.nChainHit < primeStats.nPrevChainHit)
+		fIncrementPrimorial = !fIncrementPrimorial;
+
+	primeStats.nPrevChainHit = primeStats.nChainHit;
+	primeStats.nChainHit = 0;
+	// Primecoin: dynamic adjustment of primorial multiplier
+	if (fIncrementPrimorial)
+	{
+		if (!PrimeTableGetNextPrime((unsigned int)  primeStats.nPrimorialMultiplier))
+			error("PrimecoinMiner() : primorial increment overflow");
+	}
+	else if (primeStats.nPrimorialMultiplier > 7)
+	{
+		if (!PrimeTableGetPreviousPrime((unsigned int) primeStats.nPrimorialMultiplier))
+			error("PrimecoinMiner() : primorial decrement overflow");
+	}
+}
+
+
 /*
  * Mainloop when using xpt mode
  */
@@ -660,6 +690,8 @@ int jhMiner_main_xptMode()
 	// main thread, don't query work, just wait and process
 	sint32 loopCounter = 0;
 	uint32 xptWorkIdentifier = 0xFFFFFFFF;
+	uint32 time_multiAdjust = GetTickCount();
+
 	while( true )
 	{
 		// calculate stats every second tick
@@ -678,15 +710,29 @@ int jhMiner_main_xptMode()
 			{
 				primeStats.bestPrimeChainDifficultySinceLaunch = max(primeStats.bestPrimeChainDifficultySinceLaunch, primeDifficulty);
 				double sharesPerHour = ((double)valid_shares / statsPassedTime) * 3600000.0;
+				double fourChPerHour = ((double)primeStats.fourChainCount / statsPassedTime) * 3600000.0;
 				double fiveChPerHour = ((double)primeStats.fiveChainCount / statsPassedTime) * 3600000.0;
-				printf("Shares/h: %.02f - 5ch/h: %.02f - PPS: %d - Best: %f - Max: %f\n", sharesPerHour, fiveChPerHour, (sint32)primesPerSecond, (float)primeDifficulty, (float)primeStats.bestPrimeChainDifficultySinceLaunch);
+				double sixChPerHour = ((double)primeStats.sixChainCount / statsPassedTime) * 3600000.0;
+				double sevenChPerHour = ((double)primeStats.sevenChainCount / statsPassedTime) * 3600000.0;
+				float shareValuePerHour = primeStats.fShareValue / statsPassedTime * 3600000.0;
+				printf("SPH: %.02f - Val/h %.04f - 4ch/h: %.f - 5ch/h: %.f - 6ch/h: %.02f - 7ch/h: %.02f - PPS: %d\n", 
+					sharesPerHour, shareValuePerHour, fourChPerHour, fiveChPerHour, sixChPerHour, sevenChPerHour, (sint32)primesPerSecond);
 			}
 		}
 		// wait and check some stats
 		uint32 time_updateWork = GetTickCount();
 		while( true )
 		{
-			uint32 passedTime = GetTickCount() - time_updateWork;
+			uint32 tickCount = GetTickCount();
+			uint32 passedTime = tickCount - time_updateWork;
+
+
+			if (tickCount - time_multiAdjust >= 5000)
+			{
+				MultiplierAutoAdjust();
+				time_multiAdjust = GetTickCount();
+			}
+
 			if( passedTime >= 4000 )
 				break;
 			xptClient_process(workData.xptClient);
@@ -739,14 +785,17 @@ int jhMiner_main_xptMode()
 				{
 					double poolDiff = GetPrimeDifficulty( workData.xptClient->blockWorkInfo.nBitsShare);
 					double blockDiff = GetPrimeDifficulty( workData.xptClient->blockWorkInfo.nBits);
-					printf("---- New Block: %u - Diff: %.06f / %.06f ----\n", workData.xptClient->blockWorkInfo.height, blockDiff, poolDiff);
+					printf("---- New Block: %u - Diff: %.06f / %.06f\n", workData.xptClient->blockWorkInfo.height, blockDiff, poolDiff);
+					printf("---- 6CH count: %u - 7CH count: %u - Max diff: %.005f\n", primeStats.sixChainCount, primeStats.sevenChainCount, (float)primeStats.bestPrimeChainDifficultySinceLaunch); 
+					printf("---- Adjusted PrimorialMultiplier: %u\n", primeStats.nPrimorialMultiplier);
+					printf("\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\n");
 					//printf("CH1: %u - CH2: %u - CHBiTwin: %u\n", 	primeStats.cunningham1Count, primeStats.cunningham2Count, primeStats.cunninghamBiTwinCount);
 					//primeStats.cunningham1Count = 0;
 					//primeStats.cunningham2Count = 0;
 					//primeStats.cunninghamBiTwinCount = 0;
 				}
 			}
-			Sleep(30);
+			Sleep(10);
 		}
 		loopCounter++;
 	}
@@ -780,7 +829,7 @@ int main(int argc, char **argv)
 	printf("\xBA  author: JH (http://ypool.net)                                \xBA\n");
 	printf("\xBA  contributors: x3maniac                                       \xBA\n");
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
-	printf("\xBA  Credits: mikaelh for the performance optimizations		   \xBA\n");
+	printf("\xBA  Credits: mikaelh for the performance optimizations           \xBA\n");
 	printf("\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC\n");
 	printf("Launching miner...\n");
 	// set priority lower so the user still can do other things
@@ -834,9 +883,15 @@ int main(int argc, char **argv)
 	primeStats.shareRejected = false;
 	primeStats.primeChainsFound = 0;
 	primeStats.foundShareCount = 0;
+	primeStats.fourChainCount = 0;
+	primeStats.fiveChainCount = 0;
+	primeStats.sixChainCount = 0;
+	primeStats.sevenChainCount = 0;
+	primeStats.fShareValue = 0;
 	primeStats.cunningham1Count = 0;
 	primeStats.cunningham2Count = 0;
 	primeStats.cunninghamBiTwinCount = 0;
+	primeStats.nPrimorialMultiplier = 71;
 
 	// setup thread count and print info
 	printf("Using %d threads\n", commandlineInput.numThreads);
@@ -934,6 +989,7 @@ int main(int argc, char **argv)
 //
 //#pragma data_seg() /* reset data-segment */
 
+/*
 void debug_getSieveDataHash(CSieveOfEratosthenes* sieve, uint8* hashOut)
 {
 	sha256_context ctx;
@@ -943,6 +999,8 @@ void debug_getSieveDataHash(CSieveOfEratosthenes* sieve, uint8* hashOut)
 	sha256_update(&ctx, (uint8*)sieve->vfCompositeBiTwin, (nMaxSieveSize+7)/8);
 	sha256_finish(&ctx, hashOut);
 }
+*/
+
 //
 //int mainPerformanceTest()
 //{

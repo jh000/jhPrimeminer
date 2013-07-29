@@ -20,45 +20,40 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 	const unsigned int nPrimorialMultiplierStart = 61;   
 	const unsigned int nPrimorialMultiplierMax = 79;
 
-	static int startFactorList[4] =
-	{
-		//7,7,7,7 <-- ??
-		107,107,107,107
-		// 9697,9697,9697,9697
-	};
-	//nPrimorialMultiplierStart = startFactorList[(threadIndex&3)];
-
-	unsigned int nPrimorialMultiplier = nPrimorialMultiplierStart;
+	unsigned int nPrimorialMultiplier = primeStats.nPrimorialMultiplier;
 	int64 nTimeExpected = 0;   // time expected to prime chain (micro-second)
 	int64 nTimeExpectedPrev = 0; // time expected to prime chain last time
 	bool fIncrementPrimorial = true; // increase or decrease primorial factor
+	int64 nSieveGenTime = 0;
+	
 
 	CSieveOfEratosthenes* psieve = NULL;
 
 	//primecoinBlock->nonce = 0;
 	//TODO: check this if it makes sense
 	primecoinBlock->nonce = 0x00010000 * threadIndex;
-	primecoinBlock->nonce = 0;
+	//primecoinBlock->nonce = 0;
 
-	uint32 nTime = GetTickCount() + 1000*300;
+	uint32 nTime = GetTickCount() + 1000*600;
+
+	uint32 nStatTime = GetTickCount() + 2000;
 	
 	// note: originally a wanted to loop as long as (primecoinBlock->workDataHash != jhMiner_getCurrentWorkHash()) did not happen
 	//		 but I noticed it might be smarter to just check if the blockHeight has changed, since that is what is really important
-	nPrimorialMultiplier = nPrimorialMultiplierStart;
 	uint32 loopCount = 0;
 
-	mpz_class mpzHashFactor;
-	Primorial(nPrimorialHashFactor, mpzHashFactor);
-
+	//mpz_class mpzHashFactor;
+	//Primorial(nPrimorialHashFactor, mpzHashFactor);
+	unsigned int nHashFactor = PrimorialFast(nPrimorialHashFactor);
 
 	time_t unixTimeStart;
 	time(&unixTimeStart);
 	uint32 nTimeRollStart = primecoinBlock->timestamp;
 
-
-	while( GetTickCount() < nTime && primecoinBlock->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(primecoinBlock->threadIndex) )
+	uint32 nCurrentTick = GetTickCount();
+	while( nCurrentTick < nTime && primecoinBlock->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(primecoinBlock->threadIndex) )
 	{
-
+		nCurrentTick = GetTickCount();
 		//if( primecoinBlock->xptMode )
 		//{
 		//	// when using x.pushthrough, roll time
@@ -86,7 +81,7 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
         mpz_class mpzHash;
         mpz_set_uint256(mpzHash.get_mpz_t(), phash);
         
-		while ((phash < hashBlockHeaderLimit || (mpzHash % mpzHashFactor != 0)) && primecoinBlock->nonce < 0xffff0000) {
+		while ((phash < hashBlockHeaderLimit || !mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor)) && primecoinBlock->nonce < 0xffff0000) {
 			primecoinBlock->nonce++;
 			primecoinBlock_generateHeaderHash(primecoinBlock, primecoinBlock->blockHeaderHash.begin());
             phash = primecoinBlock->blockHeaderHash;
@@ -102,45 +97,30 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		mpz_class mpzPrimorial;
 		unsigned int nRoundTests = 0;
 		unsigned int nRoundPrimesHit = 0;
-		//int64 nPrimeTimerStart = GetTimeMicros();
-		//if (nTimeExpected > nTimeExpectedPrev)
-		//	fIncrementPrimorial = !fIncrementPrimorial;
-		//nTimeExpectedPrev = nTimeExpected;
-		//// Primecoin: dynamic adjustment of primorial multiplier
-		//if (fIncrementPrimorial)
+		int64 nPrimeTimerStart = GetTickCount();
+		
+		//if( loopCount > 0 )
 		//{
-		//	if (!PrimeTableGetNextPrime(&nPrimorialMultiplier))
+		//	//primecoinBlock->nonce++;
+		//	if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
 		//		error("PrimecoinMiner() : primorial increment overflow");
 		//}
-		//else if (nPrimorialMultiplier > nPrimorialHashFactor)
-		//{
-		//	if (!PrimeTableGetPreviousPrime(&nPrimorialMultiplier))
-		//		error("PrimecoinMiner() : primorial decrement overflow");
-		//}
-
-		if( loopCount > 0 )
-		{
-			//primecoinBlock->nonce++;
-			if (!PrimeTableGetNextPrime(&nPrimorialMultiplier))
-				error("PrimecoinMiner() : primorial increment overflow");
-		}
 
 		Primorial(nPrimorialMultiplier, mpzPrimorial);
 
 		unsigned int nTests = 0;
 		unsigned int nPrimesHit = 0;
 		
-		
-		mpz_class mpzMultiplierMin = mpzPrimeMin * mpzHashFactor / mpzHash + 1;
+		mpz_class mpzMultiplierMin = mpzPrimeMin * nHashFactor / mpzHash + 1;
 		while (mpzPrimorial < mpzMultiplierMin )
 		{
-			if (!PrimeTableGetNextPrime(&nPrimorialMultiplier))
+			if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
 				error("PrimecoinMiner() : primorial minimum overflow");
 			Primorial(nPrimorialMultiplier, mpzPrimorial);
 		}
         mpz_class mpzFixedMultiplier;
-        if (mpzPrimorial > mpzHashFactor) {
-            mpzFixedMultiplier = mpzPrimorial / mpzHashFactor;
+        if (mpzPrimorial > nHashFactor) {
+            mpzFixedMultiplier = mpzPrimorial / nHashFactor;
         } else {
             mpzFixedMultiplier = 1;
         }		
@@ -152,29 +132,21 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 			// do nothing here, share is already submitted in MineProbablePrimeChain()
 			//primecoinBlock->nonce += 0x00010000;
 			primecoinBlock->nonce++;
-			nPrimorialMultiplier = nPrimorialMultiplierStart;
+			nPrimorialMultiplier = primeStats.nPrimorialMultiplier;
 			//break;
 		}
 		//psieve = NULL;
-		//nRoundTests += nTests;
+		nRoundTests += nTests;
 		nRoundPrimesHit += nPrimesHit;
+		nPrimorialMultiplier = primeStats.nPrimorialMultiplier;
 		// added this
-		//printf("nPrimorialMultiplier %u\n", nPrimorialMultiplier);
-		if( nPrimorialMultiplier > nPrimorialMultiplierMax )	//101, 108
+		if (fNewBlock)
 		{
-			primecoinBlock->nonce++;
-			nPrimorialMultiplier = nPrimorialMultiplierStart;
-//			printf("nPrimorialMultiplier reset\n");
 		}
 
-		//if( primecoinBlock->nonce >= 0x100 )
-		//{
-		//	printf("Base reset\n");
-		//	primecoinBlock->nonce = 0;
-		//	nPrimorialMultiplier = nPrimorialMultiplierStart;
-		//}
 
 		primecoinBlock->nonce++;
+		primecoinBlock->timestamp = max(primecoinBlock->timestamp, (unsigned int) time(NULL));
 		loopCount++;
 	}
 	
