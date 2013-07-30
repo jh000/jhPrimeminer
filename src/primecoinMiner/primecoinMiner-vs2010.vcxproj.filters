@@ -48,9 +48,6 @@
     <ClCompile Include="miner.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="prime2.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="jhlib\bmp.cpp">
       <Filter>Source Files\jhlib</Filter>
     </ClCompile>
@@ -138,14 +135,11 @@
     <ClCompile Include="xptServerPacketHandler.cpp">
       <Filter>Source Files\xpushthrough</Filter>
     </ClCompile>
+    <ClCompile Include="prime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="global.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="prime.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="bignum2.h">
       <Filter>Source Files\bignum</Filter>
     </ClInclude>
@@ -437,11 +431,17 @@
     <ClInclude Include="xptServer.h">
       <Filter>Source Files\xpushthrough</Filter>
     </ClInclude>
+    <ClInclude Include="prime.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="mpir.h">
-      <Filter>Source Files</Filter>
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="global.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="mpirxx.h">
-      <Filter>Source Files</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

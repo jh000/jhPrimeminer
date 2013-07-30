@@ -275,8 +275,13 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 		memcpy(xptShareToSubmit->chainMultiplier, &bnSerializeData[0], lengthBN);
 		xptShareToSubmit->chainMultiplierSize = lengthBN;
 		// todo: Set stuff like sieve size
-		if( workData.xptClient )
+		if( workData.xptClient && !workData.xptClient->disconnected)
 			xptClient_foundShare(workData.xptClient, xptShareToSubmit);
+		else
+		{
+			printf("Share submission failed. The client is not connected to the pool.");
+		}
+
 	}
 }
 
