@@ -358,11 +358,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\prime.h"
+				RelativePath=".\prime.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\prime2.cpp"
+				RelativePath=".\prime.h"
 				>
 			</File>
 			<Filter

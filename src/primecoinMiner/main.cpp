@@ -873,13 +873,9 @@ int main(int argc, char **argv)
 		printf("Missing -o option\n");
 		ExitProcess(-1);
 	}
-	//CRYPTO_set_mem_ex_functions(mallocEx, reallocEx, freeEx);
-	
-	printf("\n");
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  jhPrimeMiner - mod by hg5fm (mumus)	                        \xBA\n");
-	printf("\xBA  author: JH (http://ypool.net)                                \xBA\n");
-	printf("\xBA  contributors: x3maniac                                       \xBA\n");
+	printf("\xBA  jhPrimeMiner (v0.4 beta)                                     \xBA\n");
+	printf("\xBA  contributors: hg5fm, x3maniac, JH                            \xBA\n");
 	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
 	printf("\xBA  Credits: mikaelh for the performance optimizations           \xBA\n");
 	printf("\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC\n");
@@ -1024,73 +1020,3 @@ int main(int argc, char **argv)
 
 	return 0;
 }
-
-///*
-// * We need to call this before the actual initialization of the bignum constants in prime.h and other files
-// */
-//int preMain_initCryptoMemFunctions()
-//{
-//	//mallocSpeedupInit();
-//	/*CRYPTO_set_mem_ex_functions(mallocEx, reallocEx, freeEx);
-//	CRYPTO_set_mem_debug_functions(NULL, NULL, NULL, NULL, NULL);*/
-//	// See comment above mallocEx() method
-//	return 0;
-//}
-//
-//typedef int cb(void);
-//
-//#pragma data_seg(".CRT$XIU")
-//static cb *autostart[] = { preMain_initCryptoMemFunctions };
-//
-//#pragma data_seg() /* reset data-segment */
-
-/*
-void debug_getSieveDataHash(CSieveOfEratosthenes* sieve, uint8* hashOut)
-{
-	sha256_context ctx;
-	sha256_starts(&ctx);
-	sha256_update(&ctx, (uint8*)sieve->vfCompositeCunningham1, (nMaxSieveSize+7)/8);
-	sha256_update(&ctx, (uint8*)sieve->vfCompositeCunningham2, (nMaxSieveSize+7)/8);
-	sha256_update(&ctx, (uint8*)sieve->vfCompositeBiTwin, (nMaxSieveSize+7)/8);
-	sha256_finish(&ctx, hashOut);
-}
-*/
-
-//
-//int mainPerformanceTest()
-//{
-//	GeneratePrimeTable();
-//	// performance test for sieve generation
-//	sint32 sieveSize = 1000000;
-//	uint32 nBits = 0x07fb8bcc;
-//	uint256 blockHashHeader;
-//	yPoolWorkMgr_parseHexString("eed69c071ac2634ffc2a9e73177d1c5fad92fdf06f6d711c2f04877906ad6aef", 32*2, blockHashHeader.begin());
-//	CBigNum fixedMultiplier = CBigNum(0xB);
-//
-//	uint8 orgSieveHash[32];
-//	uint8 fastSieveHash[32];
-//
-//	printf("Generating original sieve and fast sieve...\n");
-//	uint32 time1 = GetTickCount();
-//	CSieveOfEratosthenes* originalSieve = new CSieveOfEratosthenes(sieveSize, nBits, blockHashHeader, fixedMultiplier);
-//	while (originalSieve->WeaveOriginal() );
-//	uint32 time2 = GetTickCount();
-//	printf("Original sieve time: %8dms Hash: ", time2-time1);
-//	debug_getSieveDataHash(originalSieve, orgSieveHash);
-//	for(uint32 i=0; i<12; i++)
-//		printf("%02x", orgSieveHash[i]);
-//	puts("");
-//	puts("Start generating fast sieve...\n");
-//	uint32 time3 = GetTickCount();
-//	CSieveOfEratosthenes* fastSieve = new CSieveOfEratosthenes(sieveSize, nBits, blockHashHeader, fixedMultiplier);
-//	//while (fastSieve->WeaveFast2() );
-//	fastSieve->WeaveFastAll();
-//	uint32 time4 = GetTickCount();
-//	printf("Fast sieve time:     %8dms Hash: ", time4-time3);
-//	debug_getSieveDataHash(fastSieve, fastSieveHash);
-//	for(uint32 i=0; i<12; i++)
-//		printf("%02x", fastSieveHash[i]);
-//	puts("");
-//	while( true ) Sleep(1000);
-//	return 0;
-//}

@@ -39,7 +39,19 @@ int BN2_uadd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
 
 #include "mpirxx.h"
 #include "mpir.h"
-#include<stdint.h>
+
+//#include<stdint.h> - not present in vs2008 install, instead we have the types below:
+typedef signed char int8_t;
+typedef short int int16_t;
+typedef int int32_t;
+typedef __int64 int64_t;
+
+typedef unsigned char uint8_t;
+typedef unsigned short int uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned __int64 uint64_t;
+
+
 #include"xptServer.h"
 #include"xptClient.h"
 
