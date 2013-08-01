@@ -108,8 +108,9 @@ bool xptClient_processPacket_shareAck(xptClient_t* xptClient)
 		valid_shares++;
 		time_t now = time(0);
 		char* dt = ctime(&now);
-		printf("Valid share found!");
+		printf("Share accepted by server");
 		printf(" [ %d / %d val: %.6f] %s", valid_shares, total_shares, shareValue, dt);
+		primeStats.fShareValue += shareValue;
 	}
 	else
 	{

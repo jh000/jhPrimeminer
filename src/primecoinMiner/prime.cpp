@@ -1028,16 +1028,13 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 			char sNow [80];
 			strftime (sNow, 80, "%x - %X",timeinfo);
 
-			float shareValue = pow(8, floor((float)((double)nProbableChainLength  / (double)0x1000000)) - 7);
-
-			printf("%s - SHARE FOUND !!! (Th#: %u) ---  DIFF: %f - VAL: %f    %s    %s\n", 
-				sNow, threadIndex, (float)((double)nProbableChainLength  / (double)0x1000000), shareValue, 
+			printf("%s - SHARE FOUND !!! (Th#: %u) ---  DIFF: %f    %s    %s\n", 
+				sNow, threadIndex, (float)((double)nProbableChainLength  / (double)0x1000000), 
 				nProbableChainLength >= 0x6000000 ? ">6":"", nProbableChainLength >= 0x7000000 ? ">7":"");
 
 			// submit this share
 			if (jhMiner_pushShare_primecoin(blockRawData, block))
 				primeStats.foundShareCount ++;
-			primeStats.fShareValue += shareValue;
 			//printf("Probable prime chain found for block=%s!!\n  Target: %s\n  Length: (%s %s %s)\n", block.GetHash().GetHex().c_str(),TargetToString(block.nBits).c_str(), TargetToString(nChainLengthCunningham1).c_str(), TargetToString(nChainLengthCunningham2).c_str(), TargetToString(nChainLengthBiTwin).c_str());
 			//nProbableChainLength = max(max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
 			// since we are using C structs here we have to make sure the memory for the CBigNum in the block is freed again
