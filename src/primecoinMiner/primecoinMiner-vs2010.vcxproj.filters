@@ -6,25 +6,25 @@
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
     <Filter Include="Source Files\bignum">
-      <UniqueIdentifier>{a99fef11-ff1a-48a1-a82f-3545bf4f6936}</UniqueIdentifier>
+      <UniqueIdentifier>{6748d2e9-cbfd-4aeb-944e-8387c216af45}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\jhlib">
-      <UniqueIdentifier>{5777adb8-68f8-4799-9cfd-75eb00983f19}</UniqueIdentifier>
+      <UniqueIdentifier>{83d740b9-b97c-40e2-984b-93cd0e72014c}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\crypto">
-      <UniqueIdentifier>{fd823578-65d4-4864-8f95-8461a4de07ce}</UniqueIdentifier>
+      <UniqueIdentifier>{9fa5de6a-8d09-4ccd-bca7-19b4266cf44f}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\openssl">
-      <UniqueIdentifier>{0d756095-a018-4cd3-8c94-d7bda59ee683}</UniqueIdentifier>
+      <UniqueIdentifier>{4b150080-8840-4b6b-a13e-01bda695ef98}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\json">
-      <UniqueIdentifier>{74157eba-fb7a-442a-a1ee-fe6aa8b6ba09}</UniqueIdentifier>
+      <UniqueIdentifier>{3f6a7767-9c31-4ad0-abd6-688270cf645e}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\xpushthrough">
-      <UniqueIdentifier>{ea36b907-9599-4140-85e9-7a2a88e303bc}</UniqueIdentifier>
+      <UniqueIdentifier>{22f01672-8427-4caf-9a45-bee81ee4fcb0}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\jhbignum">
-      <UniqueIdentifier>{b81f996d-cf54-4911-b34b-219860ecbc35}</UniqueIdentifier>
+      <UniqueIdentifier>{46a23f78-bd61-43e1-b382-2077d3389f39}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
@@ -431,20 +431,17 @@
     <ClInclude Include="xptServer.h">
       <Filter>Source Files\xpushthrough</Filter>
     </ClInclude>
-    <ClInclude Include="mpir.h">
+    <ClInclude Include="prime.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="mpirxx.h">
+    <ClInclude Include="mpir.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="global.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="prime.h">
+    <ClInclude Include="mpirxx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\README.md" />
   </ItemGroup>
 </Project>

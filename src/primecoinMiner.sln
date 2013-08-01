@@ -1,7 +1,7 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jhPrimeminer", "primecoinMiner\primecoinMiner.vcproj", "{51766D4B-6DD0-428F-8781-05F23E8ED221}"
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jhPrimeminer", "primecoinMiner\primecoinMiner.vcxproj", "{51766D4B-6DD0-428F-8781-05F23E8ED221}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,8 +13,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{51766D4B-6DD0-428F-8781-05F23E8ED221}.Debug|Win32.ActiveCfg = Debug|Win32
 		{51766D4B-6DD0-428F-8781-05F23E8ED221}.Debug|Win32.Build.0 = Debug|Win32
-		{51766D4B-6DD0-428F-8781-05F23E8ED221}.Debug|x64.ActiveCfg = Release|x64
-		{51766D4B-6DD0-428F-8781-05F23E8ED221}.Debug|x64.Build.0 = Release|x64
+		{51766D4B-6DD0-428F-8781-05F23E8ED221}.Debug|x64.ActiveCfg = Debug|x64
+		{51766D4B-6DD0-428F-8781-05F23E8ED221}.Debug|x64.Build.0 = Debug|x64
 		{51766D4B-6DD0-428F-8781-05F23E8ED221}.Release|Win32.ActiveCfg = Release|Win32
 		{51766D4B-6DD0-428F-8781-05F23E8ED221}.Release|Win32.Build.0 = Release|Win32
 		{51766D4B-6DD0-428F-8781-05F23E8ED221}.Release|x64.ActiveCfg = Release|x64

@@ -2,6 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jhPrimeminer", "primecoinMiner\primecoinMiner.vcxproj", "{51766D4B-6DD0-428F-8781-05F23E8ED221}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jhPrimeminer", "primecoinMiner\primecoinMiner-vs2010.vcxproj", "{51766D4B-6DD0-428F-8781-05F23E8ED221}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

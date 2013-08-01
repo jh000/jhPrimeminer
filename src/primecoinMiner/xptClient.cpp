@@ -135,6 +135,7 @@ bool xptClient_processPacket(xptClient_t* xptClient)
  */
 bool xptClient_process(xptClient_t* xptClient)
 {
+	
 	if( xptClient == NULL )
 		return false;
 	// are there shares to submit?
