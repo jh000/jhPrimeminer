@@ -261,6 +261,7 @@ class CSieveOfEratosthenes
     
     void AddMultiplier(unsigned int *vMultipliers, const unsigned int nPrimeSeq, const unsigned int nSolvedMultiplier);
 
+
     void ProcessMultiplier(unsigned long *vfComposites, const unsigned int nMinMultiplier, const unsigned int nMaxMultiplier, const std::vector<unsigned int>& vPrimes, unsigned int *vMultipliers)
     {
         // Wipe the part of the array first
@@ -269,32 +270,17 @@ class CSieveOfEratosthenes
         for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
         {
             const unsigned int nPrime = vPrimes[nPrimeSeq];
-#ifdef USE_ROTATE
             const unsigned int nRotateBits = nPrime % nWordBits;
             for (unsigned int i = 0; i < nHalfChainLength; i++)
             {
                 unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nHalfChainLength + i];
                 if (nVariableMultiplier == 0xFFFFFFFF) break;
-                unsigned long lBitMask = GetBitMask(nVariableMultiplier);
-                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
+			    for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
                 {
-                    vfComposites[GetWordNum(nVariableMultiplier)] |= lBitMask;
-                    lBitMask = (lBitMask << nRotateBits) | (lBitMask >> (nWordBits - nRotateBits));
+					vfComposites[nVariableMultiplier>>5] |= (1<<(nVariableMultiplier&31)); // shifting is actually faster than Left Rotate on a non-machine-word basis (at least on my CPU)
                 }
                 vMultipliers[nPrimeSeq * nHalfChainLength + i] = nVariableMultiplier;
             }
-#else
-            for (unsigned int i = 0; i < nHalfChainLength; i++)
-            {
-                unsigned int nVariableMultiplier = vMultipliers[nPrimeSeq * nHalfChainLength + i];
-                if (nVariableMultiplier == 0xFFFFFFFF) break;
-                for (; nVariableMultiplier < nMaxMultiplier; nVariableMultiplier += nPrime)
-                {
-                    vfComposites[GetWordNum(nVariableMultiplier)] |= GetBitMask(nVariableMultiplier);
-                }
-                vMultipliers[nPrimeSeq * nHalfChainLength + i] = nVariableMultiplier;
-            }
-#endif
         }
     }
 
@@ -403,3 +389,63 @@ inline void mpz_set_uint256(mpz_t r, uint256& u)
 
 
 #endif
+
+
+// Number of primes to test with fast divisibility testing
+static const unsigned int nFastDivPrimes = 60;
+
+class CPrimalityTestParams
+{
+public:
+	// GMP variables
+	mpz_t mpzE;
+	mpz_t mpzR;
+	mpz_t mpzRplusOne;
+
+	// GMP C++ variables
+	mpz_class mpzOriginMinusOne;
+	mpz_class mpzOriginPlusOne;
+	mpz_class N;
+
+	// Big divisors for fast div test
+	std::vector<unsigned long> vFastDivisors;
+	std::vector<unsigned int> vFastDivSeq;
+	unsigned int nFastDivisorsSize;
+
+	// Values specific to a round
+	unsigned int nBits;
+	unsigned int nPrimorialSeq;
+
+	// This is currently always false when mining
+	static const bool fFermatTest = false;
+
+	// Results
+	unsigned int nChainLengthCunningham1;
+	unsigned int nChainLengthCunningham2;
+	unsigned int nChainLengthBiTwin;
+
+	CPrimalityTestParams(unsigned int nBits, unsigned int nPrimorialSeq)
+	{
+		this->nBits = nBits;
+		this->nPrimorialSeq = nPrimorialSeq;
+		nChainLengthCunningham1 = 0;
+		nChainLengthCunningham2 = 0;
+		nChainLengthBiTwin = 0;
+		mpz_init(mpzE);
+		mpz_init(mpzR);
+		mpz_init(mpzRplusOne);
+	}
+
+	~CPrimalityTestParams()
+	{
+		mpz_clear(mpzE);
+		mpz_clear(mpzR);
+		mpz_clear(mpzRplusOne);
+	}
+};
+
+bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPrimalityTestParams& testParams, uint32 sieveFlags);
+
+#define SIEVE_FLAG_C1_COMPOSITE	(1<<0)
+#define SIEVE_FLAG_C2_COMPOSITE	(1<<1)
+#define SIEVE_FLAG_BT_COMPOSITE	(1<<2)

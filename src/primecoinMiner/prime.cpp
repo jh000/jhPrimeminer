@@ -34,8 +34,9 @@ static unsigned int int_invert(unsigned int a, unsigned int nPrime);
 
 void GeneratePrimeTable(unsigned int nSieveSize)
 {
-    const unsigned int nPrimeTableLimit = nSieveSize ;
+    const unsigned int nPrimeTableLimit = nSieveSize;
     vPrimes.clear();
+	vPrimes.reserve(nPrimeTableLimit/8);
 	// Generate prime table using sieve of Eratosthenes
     std::vector<bool> vfComposite (nPrimeTableLimit, false);
 	for (unsigned int nFactor = 2; nFactor * nFactor < nPrimeTableLimit; nFactor++)
@@ -54,7 +55,7 @@ void GeneratePrimeTable(unsigned int nSieveSize)
     const unsigned int nPrimes = vPrimes.size();
     vTwoInverses = std::vector<unsigned int> (nPrimes, 0);
     for (unsigned int nPrimeSeq = 1; nPrimeSeq < nPrimes; nPrimeSeq++)
-		{
+	{
         vTwoInverses[nPrimeSeq] = int_invert(2, vPrimes[nPrimeSeq]);
 	}
 }
@@ -251,59 +252,6 @@ static bool EulerLagrangeLifchitzPrimalityTest(const CBigNum& n, bool fSophieGer
 	nLength = (nLength & TARGET_LENGTH_MASK) | nFractionalLength;
 	return false;
 }
-
-// Number of primes to test with fast divisibility testing
-static const unsigned int nFastDivPrimes = 60;
-
-class CPrimalityTestParams
-{
-public:
-    // GMP variables
-    mpz_t mpzE;
-    mpz_t mpzR;
-    mpz_t mpzRplusOne;
-    
-    // GMP C++ variables
-    mpz_class mpzOriginMinusOne;
-    mpz_class mpzOriginPlusOne;
-    mpz_class N;
-
-    // Big divisors for fast div test
-    std::vector<unsigned long> vFastDivisors;
-    std::vector<unsigned int> vFastDivSeq;
-    unsigned int nFastDivisorsSize;
-
-    // Values specific to a round
-    unsigned int nBits;
-    unsigned int nPrimorialSeq;
-
-    // This is currently always false when mining
-    static const bool fFermatTest = false;
-
-    // Results
-    unsigned int nChainLengthCunningham1;
-    unsigned int nChainLengthCunningham2;
-    unsigned int nChainLengthBiTwin;
-
-    CPrimalityTestParams(unsigned int nBits, unsigned int nPrimorialSeq)
-    {
-        this->nBits = nBits;
-        this->nPrimorialSeq = nPrimorialSeq;
-        nChainLengthCunningham1 = 0;
-        nChainLengthCunningham2 = 0;
-        nChainLengthBiTwin = 0;
-        mpz_init(mpzE);
-        mpz_init(mpzR);
-        mpz_init(mpzRplusOne);
-    }
-
-    ~CPrimalityTestParams()
-    {
-        mpz_clear(mpzE);
-        mpz_clear(mpzR);
-        mpz_clear(mpzRplusOne);
-    }
-};
 
 
 // Check Fermat probable primality test (2-PRP): 2 ** (n-1) = 1 (mod n)
@@ -649,7 +597,7 @@ bool TargetGetNext(unsigned int nBits, int64 nInterval, int64 nTargetSpacing, in
 // Return value:
 //   true - Probable Cunningham Chain found (length at least 2)
 //   false - Not Cunningham Chain
-static bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGermain, bool fFermatTest, unsigned int& nProbableChainLength, CPrimalityTestParams& testParams)
+bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGermain, bool fFermatTest, unsigned int& nProbableChainLength, CPrimalityTestParams& testParams)
 {
     nProbableChainLength = 0;
 
@@ -663,7 +611,7 @@ static bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGerm
     while (true)
     {
         TargetIncrementLength(nProbableChainLength);
-        N <<= 1;
+		N <<= 1;
         N += (fSophieGermain? 1 : (-1));
         if (fFermatTest)
         {
@@ -780,7 +728,7 @@ bool ProbablePrimeChainTest(const mpz_class& bnPrimeChainOrigin, unsigned int nB
 // Return value:
 //   true - Probable prime chain found (one of nChainLength meeting target)
 //   false - prime chain too short (none of nChainLength meeting target)
-static bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPrimalityTestParams& testParams)
+bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPrimalityTestParams& testParams, uint32 sieveFlags)
 {
     const unsigned int nBits = testParams.nBits;
     unsigned int& nChainLengthCunningham1 = testParams.nChainLengthCunningham1;
@@ -793,13 +741,21 @@ static bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPr
     nChainLengthCunningham2 = 0;
     nChainLengthBiTwin = 0;
 
+	bool testCFirstKind = ((sieveFlags&SIEVE_FLAG_BT_COMPOSITE)!=0) || ((sieveFlags&SIEVE_FLAG_C2_COMPOSITE)!=0); // yes, C1 and C2 is switched
+	bool testCSecondKind = ((sieveFlags&SIEVE_FLAG_BT_COMPOSITE)!=0) || ((sieveFlags&SIEVE_FLAG_C1_COMPOSITE)!=0);
+
     // Test for Cunningham Chain of first kind
     mpzOriginMinusOne = mpzPrimeChainOrigin - 1;
-    ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, fFermatTest, nChainLengthCunningham1, testParams);
+	if( testCFirstKind )
+	    ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, fFermatTest, nChainLengthCunningham1, testParams);
+	else
+		nChainLengthCunningham1 = 0;
     // Test for Cunningham Chain of second kind
     mpzOriginPlusOne = mpzPrimeChainOrigin + 1;
-    ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, fFermatTest, nChainLengthCunningham2, testParams);
-
+	if( testCSecondKind )
+	    ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, fFermatTest, nChainLengthCunningham2, testParams);
+	else
+		nChainLengthCunningham2 = 0;
 	// verify if there is any chance to find a biTwin that worth calculation
 	if (nChainLengthCunningham1 < 0x2000000 || nChainLengthCunningham2 < 0x2000000)
 		return (nChainLengthCunningham1 >= nBits || nChainLengthCunningham2 >= nBits);
@@ -955,20 +911,21 @@ bool MineProbablePrimeChain(CSieveOfEratosthenes** psieve, primecoinBlock_t* blo
 			return false;
 		}
 				
-		mpzChainOrigin = mpzHash * mpzFixedMultiplier * nTriedMultiplier;		
+		mpzChainOrigin = mpzHashMultiplier * nTriedMultiplier;		
 		nChainLengthCunningham1 = 0;
 		nChainLengthCunningham2 = 0;
 		nChainLengthBiTwin = 0;
 
 		
-		bool canSubmitAsShare = ProbablePrimeChainTestFast(mpzChainOrigin, testParams);
+		bool canSubmitAsShare = ProbablePrimeChainTestFast(mpzChainOrigin, testParams, 0);
 		//CBigNum bnChainOrigin;
 		//bnChainOrigin.SetHex(mpzChainOrigin.get_str(16));
 		//bool canSubmitAsShare = ProbablePrimeChainTestBN(bnChainOrigin, block->serverData.nBitsForShare, false, nChainLengthCunningham1, nChainLengthCunningham2, nChainLengthBiTwin);
 		
 		nProbableChainLength = max(max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
 
-		if (nProbableChainLength >= 0x3000000)
+
+		if( nProbableChainLength >= 0x03000000 )
 		{
 			primeStats.nChainHit += pow(8, ((float)((double)nProbableChainLength  / (double)0x1000000))-7.0);
 			//primeStats.nChainHit += pow(8, floor((float)((double)nProbableChainLength  / (double)0x1000000)) - 7);

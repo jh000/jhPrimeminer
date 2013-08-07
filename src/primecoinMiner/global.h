@@ -172,6 +172,9 @@ uint32 _swapEndianessU32(uint32 v);
 uint32 jhMiner_getCurrentWorkBlockHeight(sint32 threadIndex);
 
 void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex);
+void BitcoinMiner2(primecoinBlock_t* primecoinBlock, sint32 threadIndex);
+
+extern std::vector<unsigned int> vPrimes;
 
 // direct access to share counters
 extern volatile int total_shares;
@@ -190,3 +193,6 @@ static inline uint32_t le32dec(const void *pp)
 	    ((uint32_t)(p[2]) << 16) + ((uint32_t)(p[3]) << 24));
 }
 #endif
+
+void mallocSpeedupInit();
+void mallocSpeedupInitPerThread();

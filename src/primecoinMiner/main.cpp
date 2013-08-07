@@ -10,6 +10,19 @@ unsigned int nMaxSieveSize;
 unsigned int nSievePercentage;
 char* dt;
 
+//#define DEFAULT_SIEVE_PERCENTAGE	40//20
+//#define DEFAULT_SIEVE_PERCENTAGE	80
+//#define DEFAULT_SIEVE_SIZE			4000000
+
+//#define DEFAULT_SIEVE_PERCENTAGE	25
+//#define DEFAULT_SIEVE_SIZE			12000000
+//#define DEFAULT_LOCKED_PRIMORIAL	79
+
+#define DEFAULT_SIEVE_PERCENTAGE	85
+#define DEFAULT_SIEVE_SIZE			4000000
+#define DEFAULT_LOCKED_PRIMORIAL	79
+
+
 bool error(const char *format, ...)
 {
 	puts(format);
@@ -281,8 +294,8 @@ bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlo
 		{
 			printf("Share submission failed. The client is not connected to the pool.");
 		}
-
 	}
+	return true;
 }
 
 int queryLocalPrimecoindBlockCount(bool useLocal)
@@ -414,6 +427,7 @@ uint32 jhMiner_getCurrentWorkBlockHeight(sint32 threadIndex)
  */
 int jhMiner_workerThread_getwork(int threadIndex)
 {
+	mallocSpeedupInitPerThread();
 	while( true )
 	{
 		uint8 localBlockData[128];
@@ -441,7 +455,7 @@ int jhMiner_workerThread_getwork(int threadIndex)
 		// ypool uses a special encrypted serverData value to speedup identification of merkleroot and share data
 		memcpy(&primecoinBlock.serverData, serverData, 32);
 		// start mining
-		BitcoinMiner(&primecoinBlock, threadIndex);
+		BitcoinMiner2(&primecoinBlock, threadIndex);
 		primecoinBlock.mpzPrimeChainMultiplier = 0;
 	}
 	return 0;
@@ -452,6 +466,7 @@ int jhMiner_workerThread_getwork(int threadIndex)
  */
 int jhMiner_workerThread_xpt(int threadIndex)
 {
+	mallocSpeedupInitPerThread();
 	while( true )
 	{
 		uint8 localBlockData[128];
@@ -475,7 +490,7 @@ int jhMiner_workerThread_xpt(int threadIndex)
 		memcpy(&primecoinBlock.serverData, serverData, 32);
 		// start mining
 		//uint32 time1 = GetTickCount();
-		BitcoinMiner(&primecoinBlock, threadIndex);
+		BitcoinMiner2(&primecoinBlock, threadIndex);
 		//printf("Mining stopped after %dms\n", GetTickCount()-time1);
 		primecoinBlock.mpzPrimeChainMultiplier = 0;
 	}
@@ -507,9 +522,9 @@ void jhMiner_printHelp()
 	puts("   -t <num>                      The number of threads for mining (default 1)");
 	puts("                                     For most efficient mining, set to number of CPU cores");
 	puts("   -s <num>                      Set MaxSieveSize range from 200000 - 10000000");
-	puts("                                     Default is 1000000.");
-	puts("   -d <num>                      Set SievePercentage - range from 1 - 100");
-	puts("                                     Default is 8 and it's not recommended to use lower values.");
+	printf("                                     Default is %d.\n", DEFAULT_SIEVE_SIZE);
+	puts("   -d <num>                      Set SievePercentage - range from 1 - 1200");
+	printf("                                     Default is %d. It's not recommended to use lower values than 10.\n", DEFAULT_SIEVE_PERCENTAGE);
 	puts("                                     It limits how many base primes are used to filter out candidate multipliers in the sieve.");
 	puts("   -primes <num>                 Sets how many prime factors are used to filter the sieve");
 	puts("                                     Default is MaxSieveSize. Valid range: 300 - 200000000");
@@ -773,7 +788,7 @@ int jhMiner_main_xptMode()
 			uint32 passedTime = tickCount - time_updateWork;
 
 
-			if (tickCount - time_multiAdjust >= 10000)
+			if (tickCount - time_multiAdjust >= 30000)
 			{
 				MultiplierAutoAdjust();
 				time_multiAdjust = GetTickCount();
@@ -858,9 +873,15 @@ int main(int argc, char **argv)
 	GetSystemInfo( &sysinfo );
 	commandlineInput.numThreads = sysinfo.dwNumberOfProcessors;
 	commandlineInput.numThreads = max(commandlineInput.numThreads, 1);
-	commandlineInput.sieveSize = 1000000; // default maxSieveSize
-	commandlineInput.sievePercentage = 8; // default 
+	//commandlineInput.sieveSize = 4000000; // default maxSieveSize
+	//commandlineInput.sievePercentage = 35; // default 
+	//commandlineInput.sievePrimeLimit = 0;
+
+	//commandlineInput.sieveSize = 4000000; // default maxSieveSize
+	commandlineInput.sieveSize = DEFAULT_SIEVE_SIZE; // default maxSieveSize
+	commandlineInput.sievePercentage = DEFAULT_SIEVE_PERCENTAGE; // default 
 	commandlineInput.sievePrimeLimit = 0;
+
 	// parse command lines
 	jhMiner_parseCommandline(argc, argv);
 	// Sets max sieve size
@@ -868,6 +889,9 @@ int main(int argc, char **argv)
 	nSievePercentage = commandlineInput.sievePercentage;
 	if (commandlineInput.sievePrimeLimit == 0) //default before parsing 
 		commandlineInput.sievePrimeLimit = commandlineInput.sieveSize;  //default is sieveSize 
+	if( nSievePercentage >= 100 )
+		commandlineInput.sievePrimeLimit = (uint32)(((uint64)nSievePercentage*(uint64)commandlineInput.sieveSize)/100ULL); // allow sieve prime percentages larger than 100%
+
 	if( commandlineInput.host == NULL )
 	{
 		printf("Missing -o option\n");
@@ -875,11 +899,14 @@ int main(int argc, char **argv)
 	}
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
 	printf("\xBA  jhPrimeMiner (v0.4 beta)                                     \xBA\n");
-	printf("\xBA  contributors: hg5fm, x3maniac, JH                            \xBA\n");
-	printf("\xBA  Credits: Sunny King for the original Primecoin client&miner  \xBA\n");
-	printf("\xBA  Credits: mikaelh for the performance optimizations           \xBA\n");
+	printf("\xBA  contributors: hg5fm, x3maniac, jh                            \xBA\n");
+	printf("\xBA  credits: Sunny King for the original Primecoin client&miner  \xBA\n");
+	printf("\xBA  credits: mikaelh for the performance optimizations           \xBA\n");
 	printf("\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC\n");
 	printf("Launching miner...\n");
+	printf("Notice:\n   This release contains an experimental algorithm that can cause repeated\n   share submissions. Dont worry if you receive a few rejected shares in a row.\n");
+	mallocSpeedupInit();
+	mallocSpeedupInitPerThread();
 	// set priority lower so the user still can do other things
 	SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
 	// init memory speedup (if not already done in preMain)
@@ -939,7 +966,7 @@ int main(int argc, char **argv)
 	primeStats.cunningham1Count = 0;
 	primeStats.cunningham2Count = 0;
 	primeStats.cunninghamBiTwinCount = 0;
-	primeStats.nPrimorialMultiplier = 71;
+	primeStats.nPrimorialMultiplier = 79;
 
 	// setup thread count and print info
 	printf("Using %d threads\n", commandlineInput.numThreads);

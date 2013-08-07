@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioProject
+	ProjectType="Intel C++ Project"
+	Version="11.1"
+	Name="jhPrimeminer"
+	ProjectGUID="{48E5C715-B34F-4642-B356-E1433D71D8A6}"
+	VCNestedProjectGUID="{51766D4B-6DD0-428F-8781-05F23E8ED221}"
+	VCNestedProjectFileName="primecoinMiner.vcproj">
+	<Configurations>
+		<Configuration
+			Name="Release|x64">
+			<Tool
+				Name="CppCmplrTool"
+				GlobalOptimizations="true"
+				OptimizeForWindowsApplication="true"
+				EnableEnhancedInstructionSet="1000"
+				FloatingPointSpeculation="0"
+				UseIntelOptimizedHeaders="true"
+				ProfileGuidedOptimization="0"/>
+		</Configuration>
+	</Configurations>
+	<Files/>
+</VisualStudioProject>

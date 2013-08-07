@@ -141,7 +141,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="lib\openssl64\libeay32MT.lib lib\openssl64\ssleay32MT.lib lib\mpir\Release64\mpir.lib"
+				AdditionalDependencies="lib\openssl64\libeay32MT.lib lib\openssl64\ssleay32MT.lib lib\mpir64\Release64\mpir.lib"
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				TargetMachine="17"
@@ -284,9 +284,13 @@
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
 				AdditionalIncludeDirectories=".\includes\"
+				ExceptionHandling="0"
+				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
+				BufferSecurityCheck="false"
 				EnableFunctionLevelLinking="true"
-				EnableEnhancedInstructionSet="2"
+				EnableEnhancedInstructionSet="0"
+				AssemblerOutput="2"
 				WarningLevel="3"
 				DebugInformationFormat="3"
 			/>
@@ -301,7 +305,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="lib\openssl64\libeay32MT.lib lib\openssl64\ssleay32MT.lib lib\mpir64\Release64\mpir.lib"
+				AdditionalDependencies="lib\openssl64\libeay32MT.lib lib\openssl64\ssleay32MT.lib lib\mpir64\Release64\mpir.lib lib\mpir64\Release64\mpirxx.lib"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -355,7 +359,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\mallocSpeedup.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\miner.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\miner2.cpp"
 				>
 			</File>
 			<File
