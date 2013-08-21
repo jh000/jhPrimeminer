@@ -13,6 +13,7 @@ static const int PROTOCOL_VERSION = 70001;
 
 #include<openssl/bn.h>
 
+#include"cl/opencl.h"
 
 // our own improved versions of BN functions
 BIGNUM *BN2_mod_inverse(BIGNUM *in,	const BIGNUM *a, const BIGNUM *n, BN_CTX *ctx);
@@ -126,8 +127,8 @@ typedef struct
 	volatile uint32 cunningham1Count;
 	volatile uint32 cunningham2Count;
 	volatile uint32 cunninghamBiTwinCount;
-	volatile float nChainHit;
-	volatile float nPrevChainHit;
+	volatile uint64 nChainHit;
+	volatile double nPrevChainHit;
 	volatile unsigned int nPrimorialMultiplier;
 	CRITICAL_SECTION cs;
 
@@ -140,6 +141,10 @@ typedef struct
 	bool shareFound;
 	bool shareRejected;
 
+	// start for auto tuning
+	volatile uint32 numTestedCandidates;
+	volatile uint32 numPrimeCandidates;
+	volatile uint64 numAllTestedNumbers; // count of all tested numbers (including numbers that did not pass the sieve)
 }primeStats_t;
 
 extern primeStats_t primeStats;
@@ -164,6 +169,16 @@ typedef struct
 
 extern jsonRequestTarget_t jsonRequestTarget; // rpc login data
 
+typedef struct  
+{
+	sint32 nSieveSize;
+	sint32 nPrimesToSieve;
+	sint32 nPrimorialMultiplier;
+	sint32 sievePercentage;
+}minerSettings_t;
+
+extern minerSettings_t minerSettings;
+
 // prototypes from main.cpp
 bool error(const char *format, ...);
 bool jhMiner_pushShare_primecoin(uint8 data[256], primecoinBlock_t* primecoinBlock);
@@ -172,9 +187,8 @@ uint32 _swapEndianessU32(uint32 v);
 uint32 jhMiner_getCurrentWorkBlockHeight(sint32 threadIndex);
 
 void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex);
-void BitcoinMiner2(primecoinBlock_t* primecoinBlock, sint32 threadIndex);
-
-extern std::vector<unsigned int> vPrimes;
+void BitcoinMiner_multipassSieve(primecoinBlock_t* primecoinBlock, sint32 threadIndex);
+void BitcoinMiner_openCL(primecoinBlock_t* primecoinBlock, sint32 threadIndex);
 
 // direct access to share counters
 extern volatile int total_shares;

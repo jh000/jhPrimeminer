@@ -1714,14 +1714,14 @@ public:
 
   // bool fits_schar_p() const { return mpz_fits_schar_p(mp); }
   // bool fits_uchar_p() const { return mpz_fits_uchar_p(mp); }
-  bool fits_sint_p() const { return mpz_fits_sint_p(mp); }
-  bool fits_uint_p() const { return mpz_fits_uint_p(mp); }
-  bool fits_si_p() const { return mpz_fits_si_p(mp); }
-  bool fits_ui_p() const { return mpz_fits_ui_p(mp); }
-  bool fits_sshort_p() const { return mpz_fits_sshort_p(mp); }
-  bool fits_ushort_p() const { return mpz_fits_ushort_p(mp); }
-  bool fits_slong_p() const { return mpz_fits_slong_p(mp); }
-  bool fits_ulong_p() const { return mpz_fits_ulong_p(mp); }
+  bool fits_sint_p() const { return mpz_fits_sint_p(mp)!=0; }
+  bool fits_uint_p() const { return mpz_fits_uint_p(mp)!=0; }
+  bool fits_si_p() const { return mpz_fits_si_p(mp)!=0; }
+  bool fits_ui_p() const { return mpz_fits_ui_p(mp)!=0; }
+  bool fits_sshort_p() const { return mpz_fits_sshort_p(mp)!=0; }
+  bool fits_ushort_p() const { return mpz_fits_ushort_p(mp)!=0; }
+  bool fits_slong_p() const { return mpz_fits_slong_p(mp)!=0; }
+  bool fits_ulong_p() const { return mpz_fits_ulong_p(mp)!=0; }
   // bool fits_float_p() const { return mpz_fits_float_p(mp); }
   // bool fits_double_p() const { return mpz_fits_double_p(mp); }
   // bool fits_ldouble_p() const { return mpz_fits_ldouble_p(mp); }
@@ -2128,14 +2128,14 @@ public:
 
   // bool fits_schar_p() const { return mpf_fits_schar_p(mp); }
   // bool fits_uchar_p() const { return mpf_fits_uchar_p(mp); }
-  bool fits_sint_p() const { return mpf_fits_sint_p(mp); }
-  bool fits_uint_p() const { return mpf_fits_uint_p(mp); }
-  bool fits_si_p() const { return mpf_fits_si_p(mp); }
-  bool fits_ui_p() const { return mpf_fits_ui_p(mp); }
-  bool fits_sshort_p() const { return mpf_fits_sshort_p(mp); }
-  bool fits_ushort_p() const { return mpf_fits_ushort_p(mp); }
-  bool fits_slong_p() const { return mpf_fits_slong_p(mp); }
-  bool fits_ulong_p() const { return mpf_fits_ulong_p(mp); }
+  bool fits_sint_p() const { return mpf_fits_sint_p(mp)!=0; }
+  bool fits_uint_p() const { return mpf_fits_uint_p(mp)!=0; }
+  bool fits_si_p() const { return mpf_fits_si_p(mp)!=0; }
+  bool fits_ui_p() const { return mpf_fits_ui_p(mp)!=0; }
+  bool fits_sshort_p() const { return mpf_fits_sshort_p(mp)!=0; }
+  bool fits_ushort_p() const { return mpf_fits_ushort_p(mp)!=0; }
+  bool fits_slong_p() const { return mpf_fits_slong_p(mp)!=0; }
+  bool fits_ulong_p() const { return mpf_fits_ulong_p(mp)!=0; }
   // bool fits_float_p() const { return mpf_fits_float_p(mp); }
   // bool fits_double_p() const { return mpf_fits_double_p(mp); }
   // bool fits_ldouble_p() const { return mpf_fits_ldouble_p(mp); }

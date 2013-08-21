@@ -1173,10 +1173,10 @@ __GMP_DECLSPEC void mpn_mulmod_2expm1 __GMP_PROTO ((mp_ptr, mp_ptr, mp_ptr, mpir
 #if __GMP_INLINE_PROTOTYPES || defined (__GMP_FORCE_mpn_cmp)
 __GMP_DECLSPEC int mpn_cmp __GMP_PROTO ((mp_srcptr, mp_srcptr, mp_size_t)) __GMP_NOTHROW __GMP_ATTRIBUTE_PURE;
 #endif
-#define mpn_redc_1 __MPN(redc_1)
-__GMP_DECLSPEC void mpn_redc_1 __GMP_PROTO ((mp_ptr, mp_ptr, mp_srcptr, mp_size_t, mp_limb_t);)
-#define mpn_redc_2 __MPN(redc_2)
-__GMP_DECLSPEC void mpn_redc_2 __GMP_PROTO ((mp_ptr, mp_ptr, mp_srcptr, mp_size_t, mp_srcptr));
+mp_limb_t
+mpn_redc_1 (mp_ptr rp, mp_ptr up, mp_srcptr mp, mp_size_t n, mp_limb_t invm);
+mp_limb_t
+mpn_redc_2 (mp_ptr rp, mp_ptr up, mp_srcptr mp, mp_size_t n, mp_srcptr mip);
 #define mpn_redc_n __MPN(redc_n)
 __GMP_DECLSPEC void mpn_redc_n __GMP_PROTO ((mp_ptr, mp_ptr, mp_srcptr, mp_size_t, mp_srcptr));
 #define mpn_divexact_by3(dst,src,size) \

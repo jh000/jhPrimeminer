@@ -293,6 +293,8 @@ char* fStrDup(char *src)
 
 char* fStrDup(char *src, sint32 length)
 {
+	sint32 srcLength = fStrLen(src);
+	length = min(length, srcLength);
 	char* ns = (char*)malloc(length+1);
 	RtlCopyMemory(ns, src, length);
 	ns[length] = '\0';

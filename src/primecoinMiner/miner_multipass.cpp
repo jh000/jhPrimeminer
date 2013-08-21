@@ -21,97 +21,97 @@ typedef struct
 
 typedef struct  
 {
-	uint32			numPrimeFactors; // how many prime factors are filtered
+	//uint32			numPrimeFactors; // how many prime factors are filtered
 	cPrimeFactor_t*	primeFactorBase;
 	uint32			chainLength; // equal to number of layers
 	uint8*			layerMaskC1;
 	uint8*			layerMaskC2;
 	//uint32**		layerMaskBT;
 	uint32			maskBytes;
-	uint32			sieveSize;
 	// multiplier scan
 	uint32			currentMultiplierScanIndex;
 	uint32			currentSieveLayerIdx;
 	// mpz
 	mpz_class		mpzFixedMultiplier;
+	// settings used to create the sieve
+	uint32			nPrimeFactors;
+	uint32			sieveSize;
 }continuousSieve_t;
 
 __declspec( thread ) continuousSieve_t* cSieve = NULL;
 
-void cSieve_prepare(mpz_class& mpzFixedMultiplier, uint32 chainLength)
+void cSieve_prepare(mpz_class& mpzFixedMultiplier, uint32 chainLength, uint32 overwritePrimeFactors=0, uint32 overwriteSieveSize=0)
 {
-	uint32 sieveSize = (nMaxSieveSize+7)&~7; // align to 8
+	uint32 sieveSize = (minerSettings.nSieveSize+31)&~31; // align to 32 (4 bytes)
+	if( overwriteSieveSize )
+		sieveSize = (overwriteSieveSize+31)&~31;
 	// todo: Make sure the sieve doesnt crash when the difficulty changes
-	if( cSieve == NULL || cSieve->chainLength != chainLength )
+	if( cSieve == NULL || cSieve->chainLength != chainLength || cSieve->sieveSize != sieveSize || cSieve->nPrimeFactors != minerSettings.nPrimesToSieve )
 	{
 		if( cSieve == NULL )
 		{
 			cSieve = (continuousSieve_t*)malloc(sizeof(continuousSieve_t));
 			memset(cSieve, 0x00, sizeof(continuousSieve_t));
 		}
-		// free bitmasks if the size changed
-		if( cSieve->chainLength != chainLength )
-		{
-			if( cSieve->layerMaskC1 )
-			{
-				free(cSieve->layerMaskC1);
-				free(cSieve->layerMaskC2);
-				//free(cSieve->layerMaskBT);
-				cSieve->layerMaskC1 = NULL;
-				cSieve->layerMaskC2 = NULL;
-				//cSieve->layerMaskBT = NULL;
-			}
-		}
-		// alloc sieve mask
+		// start setting up sieve properties early (to avoid threading issues)
 		cSieve->sieveSize = sieveSize;
 		cSieve->chainLength = chainLength;
-		cSieve->maskBytes = (sieveSize+7)/8;
+		if( cSieve->sieveSize & 7 )
+			__debugbreak(); // must not happen
+		cSieve->maskBytes = cSieve->sieveSize/8;
+		if( overwritePrimeFactors == 0 )
+			cSieve->nPrimeFactors = minerSettings.nPrimesToSieve;
+		else
+			cSieve->nPrimeFactors = overwritePrimeFactors;
+		// free everything that has been allocated before
+		if( cSieve->layerMaskC1 )
+		{
+			free(cSieve->layerMaskC1);
+			free(cSieve->layerMaskC2);
+			cSieve->layerMaskC1 = NULL;
+			cSieve->layerMaskC2 = NULL;
+		}
+		if( cSieve->primeFactorBase )
+		{
+			free(cSieve->primeFactorBase);
+			cSieve->primeFactorBase = NULL;
+		}
+		// alloc sieve mask
 		uint32 chainMaskSize = cSieve->maskBytes * chainLength;
 		if( cSieve->layerMaskC1 == NULL )
 		{
 			cSieve->layerMaskC1 = (uint8*)malloc(chainMaskSize);
 			cSieve->layerMaskC2 = (uint8*)malloc(chainMaskSize);
-			//cSieve->layerMaskBT = (uint8*)malloc(chainMaskSize);
 		}
-		// reset sieve
-		memset(cSieve->layerMaskC1, 0x00, chainMaskSize);
-		memset(cSieve->layerMaskC2, 0x00, chainMaskSize);
-		//memset(cSieve->layerMaskBT, 0x00, chainMaskSize);
-	}
-	// alloc prime factor base table
-	if( cSieve->primeFactorBase == NULL )
-	{
-		unsigned int nPrimes = 0;
-		if( nSievePercentage <= 100 )
-			nPrimes = (uint64)vPrimes.size() * (uint64)nSievePercentage / 100ULL;
-		else
-			nPrimes = vPrimes.size(); // use the whole array to avoid rounding problems and out-of-bounds access
-		cSieve->numPrimeFactors = nPrimes;//50000;
-		cSieve->primeFactorBase = (cPrimeFactor_t*)malloc(sizeof(cPrimeFactor_t)*cSieve->numPrimeFactors);
-		for(uint32 i=0; i<cSieve->numPrimeFactors; i++)
+		// alloc prime factor base table
+		if( cSieve->primeFactorBase == NULL )
 		{
-			cSieve->primeFactorBase[i].twoInverse = single_modinv(2, vPrimes[i]);
+			cSieve->primeFactorBase = (cPrimeFactor_t*)malloc(sizeof(cPrimeFactor_t)*cSieve->nPrimeFactors);
+			for(uint32 i=0; i<cSieve->nPrimeFactors; i++)
+			{
+				cSieve->primeFactorBase[i].twoInverse = single_modinv(2, vPrimes[i]);
+			}
 		}
 	}
 	// calculate fixed inverse
 	mpz_class mpzF, mpzTemp;
-	for(uint32 i=0; i<cSieve->numPrimeFactors; i++)
+	for(uint32 i=0; i<cSieve->nPrimeFactors; i++)
 	{
 		uint32 p = vPrimes[i];
 		uint32 fixedFactorMod = mpz_mod_ui(mpzTemp.get_mpz_t(), mpzFixedMultiplier.get_mpz_t(), p);
 		cSieve->primeFactorBase[i].mod = fixedFactorMod; 
 		cSieve->primeFactorBase[i].base = single_modinv(fixedFactorMod, p); 
 	}
-	// do sieving for the first nChainLength layers
-	//for(uint32 t=0; t<cSieve->chainLength; t++)
-	//for(uint32 t=0; t<cSieve->chainLength; t++)
+	// reset sieve
+	memset(cSieve->layerMaskC1, 0x00, cSieve->maskBytes * chainLength);
+	memset(cSieve->layerMaskC2, 0x00, cSieve->maskBytes * chainLength);
 	cSieve->mpzFixedMultiplier = mpzFixedMultiplier;
 	for(uint32 t=0; t<cSieve->chainLength; t++)
 	{
 		mpzF = mpzFixedMultiplier;
 		uint8* maskC1 = cSieve->layerMaskC1+t*cSieve->maskBytes; 
 		uint8* maskC2 = cSieve->layerMaskC2+t*cSieve->maskBytes; 
-		for(uint32 i=0; i<cSieve->numPrimeFactors; i++)
+		for(uint32 i=0; i<cSieve->nPrimeFactors; i++)
 		{
 			if( cSieve->primeFactorBase[i].mod == 0 )
 				continue;
@@ -128,10 +128,8 @@ void cSieve_prepare(mpz_class& mpzFixedMultiplier, uint32 chainLength)
 				nSolvedMultiplier += p;
 			}
 			// mark all cunningham chains of second kind
-			uint64 nSolvedMultiplier64 = (uint64)cSieve->primeFactorBase[i].base * (uint64)(p-1); // tested and correct
-			nSolvedMultiplier64 %= (uint64)p;
-
-			nSolvedMultiplier = (uint32)nSolvedMultiplier64;
+			nSolvedMultiplier = -cSieve->primeFactorBase[i].base + p; // tested and correct
+			nSolvedMultiplier %= (uint64)p;
 			while( nSolvedMultiplier < cSieve->sieveSize )
 			{
 				maskC2[nSolvedMultiplier>>3] |= (1<<(nSolvedMultiplier&7));			
@@ -149,14 +147,14 @@ void cSieve_prepare(mpz_class& mpzFixedMultiplier, uint32 chainLength)
 
 bool cSieve_sieveNextLayer()
 {
-	if( cSieve->currentSieveLayerIdx > 64 )
+	if( cSieve->currentSieveLayerIdx > 108 )
 		return false;
 	uint32 layerIdx = cSieve->currentSieveLayerIdx % cSieve->chainLength;
 	uint8* maskC1 = cSieve->layerMaskC1+layerIdx*cSieve->maskBytes; 
 	uint8* maskC2 = cSieve->layerMaskC2+layerIdx*cSieve->maskBytes;
 	memset(maskC1, 0x00, cSieve->maskBytes);
 	memset(maskC2, 0x00, cSieve->maskBytes);
-	for(uint32 i=0; i<cSieve->numPrimeFactors; i++)
+	for(uint32 i=0; i<cSieve->nPrimeFactors; i++)
 	{
 		if( cSieve->primeFactorBase[i].mod == 0 )
 			continue;
@@ -169,9 +167,7 @@ bool cSieve_sieveNextLayer()
 			nSolvedMultiplier += p;
 		}
 		// mark all cunningham chains of second kind
-		uint64 nSolvedMultiplier64 = (uint64)cSieve->primeFactorBase[i].base * (uint64)(p-1);
-		nSolvedMultiplier64 %= (uint64)p;
-		nSolvedMultiplier = (uint32)nSolvedMultiplier64;
+		nSolvedMultiplier = p - cSieve->primeFactorBase[i].base;
 		while( nSolvedMultiplier < cSieve->sieveSize )
 		{
 			maskC2[nSolvedMultiplier>>3] |= (1<<(nSolvedMultiplier&7));			
@@ -191,19 +187,19 @@ uint32 cSieve_findNextMultiplier(uint32* multiplierSieveFlags)
 {
 	*multiplierSieveFlags = 0;
 	uint32 multiplier = cSieve->currentMultiplierScanIndex;
-	if( cSieve->currentSieveLayerIdx & 1 )
-		multiplier |= 1; // make sure we only process odd multipliers on every odd layer
-	if( cSieve->chainLength >= 64 )
+	if( cSieve->currentSieveLayerIdx > 0 )
+		multiplier |= 1; // make sure we only process odd multipliers on every layer above 0
+	if( cSieve->chainLength >= 128 )
 	{
 		printf("cSieve_findNextMultiplier(): fatal error, difficulty exceeds allowed value\n");
 		ExitProcess(0);
 	}
-	uint8* maskPtrC1[32]; // works unless difficulty is greater than 32
-	uint8* maskPtrC2[32];
+	uint32* maskPtrC1[32]; // works unless difficulty is greater than 32
+	uint32* maskPtrC2[32];
 	for(uint32 i=0; i<cSieve->chainLength; i++)
 	{
-		maskPtrC1[i] = cSieve->layerMaskC1+i*cSieve->maskBytes;
-		maskPtrC2[i] = cSieve->layerMaskC2+i*cSieve->maskBytes;
+		maskPtrC1[i] = (uint32*)(cSieve->layerMaskC1+i*cSieve->maskBytes);
+		maskPtrC2[i] = (uint32*)(cSieve->layerMaskC2+i*cSieve->maskBytes);
 	}
 	uint32 btn = cSieve->chainLength/2;
 	uint32 sieveLayerIdx = cSieve->currentSieveLayerIdx;
@@ -215,19 +211,19 @@ uint32 cSieve_findNextMultiplier(uint32* multiplierSieveFlags)
 			return 0;
 		}
 		// get mask for this byte
-		uint32 compositeMaskIdx = multiplier>>3;
+		uint32 compositeMaskIdx = multiplier>>5;
 		// bitwin mask part
-		uint8 maskBtC1 = 0;
-		uint8 maskBtC2 = 0;
+		uint32 maskBtC1 = 0;
+		uint32 maskBtC2 = 0;
 		for(uint32 i=0; i<btn; i++)
 		{
 			maskBtC1 |= maskPtrC1[(sieveLayerIdx+i)%cSieve->chainLength][compositeMaskIdx];
 			maskBtC2 |= maskPtrC2[(sieveLayerIdx+i)%cSieve->chainLength][compositeMaskIdx];
-			// note: We ignore the fact that we should actually look for 9 length, not 8 due to 9/2 = 4
+			// note: We ignore the fact that we should actually look for 9 length, not 8 due to 9/2 = 4 (will fix itself when difficulty is even)
 		}
 		// remaining mask
-		uint8 maskC1 = 0;
-		uint8 maskC2 = 0;
+		uint32 maskC1 = 0;
+		uint32 maskC2 = 0;
 		for(uint32 i=btn; i<cSieve->chainLength; i++)
 		{
 			maskC1 |= maskPtrC1[(sieveLayerIdx+i)%cSieve->chainLength][compositeMaskIdx];
@@ -237,72 +233,132 @@ uint32 cSieve_findNextMultiplier(uint32* multiplierSieveFlags)
 		maskC2 |= maskBtC2;
 		uint32 maskBt = maskBtC1|maskBtC2;
 		// should we skip parsing this mask?
-		if( maskC1 == 0xFF && maskC2 == 0xFF && maskBt == 0xFF )
+		if( maskC1 == 0xFFFFFFFF && maskC2 == 0xFFFFFFFF && maskBt == 0xFFFFFFFF )
 		{
-			multiplier = (multiplier+7)&~7;
-			multiplier = multiplier + 8;
+			multiplier = (multiplier+31)&~31;
+			multiplier = multiplier + 32;
 			continue;
 		}
 		// parse the mask bits
-		uint32 multParse = multiplier - (multiplier&~7);
-		multParse = 8 - multParse;
-		for(uint32 t=0; t<multParse; t++)
+		if( cSieve->currentSieveLayerIdx > 0 )
+			multiplier |= 1;
+		uint32 multParse = multiplier - (multiplier&~31);
+		multParse = 32 - multParse;
+		if( cSieve->currentSieveLayerIdx > 0 )
 		{
-			// process until aligned to 8
-			if( multiplier >= cSieve->sieveSize )
+			// parse odd 32 bit
+			for(uint32 t=0; t<multParse; t += 2)
 			{
-				cSieve->currentMultiplierScanIndex = cSieve->sieveSize;
-				return 0;
-			}
-			uint8 compositeMask = 1<<(multiplier&7);
+				// process until aligned to 32
+				if( multiplier >= cSieve->sieveSize )
+				{
+					cSieve->currentMultiplierScanIndex = cSieve->sieveSize;
+					return 0;
+				}
+				uint32 compositeMask = 1<<(multiplier&31);
+				//printf("%08X\n", 1<<(multiplier&31));
 
-			if( (maskBt&maskC1&maskC2&compositeMask)==0 )
-			{
-				// good multiplier found
-				if( maskBt&compositeMask )
-					*multiplierSieveFlags |= SIEVE_FLAG_BT_COMPOSITE;
-				if( maskC1&compositeMask )
-					*multiplierSieveFlags |= SIEVE_FLAG_C1_COMPOSITE;
-				if( maskC2&compositeMask )
-					*multiplierSieveFlags |= SIEVE_FLAG_C2_COMPOSITE;
-				cSieve->currentMultiplierScanIndex = multiplier+1;
-				return multiplier;
-			}
-
-			//if( (maskBt&compositeMask)==0 )
-			//{
-			//	// good multiplier found
-			//	if( maskBt&compositeMask )
-			//		*multiplierSieveFlags |= 0; // none is really composite
-			//	cSieve->currentMultiplierScanIndex = multiplier+1;
-			//	return multiplier;
-			//}
-			//else if( (maskC1&compositeMask)==0 )
-			//{
-			//	// good multiplier found
-			//	if( maskC2&compositeMask )
-			//		*multiplierSieveFlags |= SIEVE_FLAG_C2_COMPOSITE | SIEVE_FLAG_BT_COMPOSITE;
-			//	cSieve->currentMultiplierScanIndex = multiplier+1;
-			//	return multiplier;
-			//}
-			//else if( (maskC2&compositeMask)==0 )
-			//{
-			//	// good multiplier found
-			//	if( maskC1&compositeMask )
-			//		*multiplierSieveFlags |= SIEVE_FLAG_C1_COMPOSITE | SIEVE_FLAG_BT_COMPOSITE;
-			//	cSieve->currentMultiplierScanIndex = multiplier+1;
-			//	return multiplier;
-			//}
-			if( cSieve->currentSieveLayerIdx & 1 )
+				if( (maskBt&maskC1&maskC2&compositeMask)==0 )
+				{
+					// good multiplier found
+					if( maskBt&compositeMask )
+						*multiplierSieveFlags |= SIEVE_FLAG_BT_COMPOSITE;
+					if( maskC1&compositeMask )
+						*multiplierSieveFlags |= SIEVE_FLAG_C1_COMPOSITE;
+					if( maskC2&compositeMask )
+						*multiplierSieveFlags |= SIEVE_FLAG_C2_COMPOSITE;
+					cSieve->currentMultiplierScanIndex = multiplier+2;
+					return multiplier;
+				}
 				multiplier += 2;
-			else
-				multiplier++;
+			}
 		}
+		else
+		{
+			// parse full 32 bit
+			for(uint32 t=0; t<multParse; t++)
+			{
+				// process until aligned to 32
+				if( multiplier >= cSieve->sieveSize )
+				{
+					cSieve->currentMultiplierScanIndex = cSieve->sieveSize;
+					return 0;
+				}
+				uint32 compositeMask = 1<<(multiplier&31);
+
+				if( (maskBt&maskC1&maskC2&compositeMask)==0 )
+				{
+					// good multiplier found
+					if( maskBt&compositeMask )
+						*multiplierSieveFlags |= SIEVE_FLAG_BT_COMPOSITE;
+					if( maskC1&compositeMask )
+						*multiplierSieveFlags |= SIEVE_FLAG_C1_COMPOSITE;
+					if( maskC2&compositeMask )
+						*multiplierSieveFlags |= SIEVE_FLAG_C2_COMPOSITE;
+					cSieve->currentMultiplierScanIndex = multiplier+1;
+					return multiplier;
+				}
+				multiplier++;
+			}
+		}	
 	}
 	return 0;
 }
 
-bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGermain, bool fFermatTest, unsigned int& nProbableChainLength, CPrimalityTestParams& testParams);
+/*
+ * Used to print out the first 100 multipliers that passed the sieve
+ * Useful to compare with other sieve implementations
+ */
+void cSieve_debug(mpz_class& mpzFixedMultiplier, uint32 chainLength, uint32 primeFactors, uint32 sieveSize)
+{
+	cSieve_prepare(mpzFixedMultiplier, chainLength, primeFactors, sieveSize);
+	
+	uint32 rows = 128;
+	uint32 pixelsPerRow = cSieve->sieveSize / rows;
+
+	uint8* pixelMap = (uint8*)malloc(cSieve->sieveSize*(cSieve->chainLength*2)*3);
+	memset(pixelMap, 0x00, cSieve->sieveSize*cSieve->chainLength*2*3);
+	uint32 pixelPerRow = cSieve->sieveSize;
+	for(sint32 y=0; y<cSieve->chainLength; y++)
+	{
+		for(sint32 x=0; x<cSieve->sieveSize; x++)
+		{
+			uint32 rowY = y*cSieve->chainLength*2 + x / pixelsPerRow;
+			uint32 maskBase = cSieve->maskBytes*rowY;
+			uint32 maskIdx = x>>3;
+			uint32 maskVal = 1<<(x&7);
+			uint32 mC1 = cSieve->layerMaskC1[maskBase+maskIdx] & maskVal;
+			uint32 mC2 = cSieve->layerMaskC2[maskBase+maskIdx] & maskVal;
+			uint32 pIdx = (x+y*pixelsPerRow)*3;
+			pixelMap[pIdx+0] = 0;
+			pixelMap[pIdx+1] = 0;
+			pixelMap[pIdx+2] = 0;
+			if( mC1 == 0 )
+				pixelMap[pIdx+2] = 0xFF;
+			if( mC2 == 0 )
+				pixelMap[pIdx+0] = 0xFF;
+		}
+	}	
+	bitmap_t bmp;
+	bmp.bitDepth = 24;
+	bmp.data = pixelMap;
+	bmp.sizeX = pixelsPerRow;
+	bmp.sizeY = cSieve->chainLength*rows;
+	printf("cSieve_debug(): Saving sieve debug image...\n");
+	bmp_save("C:\\test\\sieve.bmp", &bmp);
+
+	uint32 multiplier = 0;
+	for(uint32 i=0; i<100; i++)
+	{
+		uint32 sieveFlags = 0;
+		multiplier = cSieve_findNextMultiplier(&sieveFlags);
+		if( multiplier == 0 )
+			break;
+		printf("cSieve mult[%04d]: %d\n", i, multiplier);
+	}
+}
+
+bool ProbableCunninghamChainTestFast(const mpz_class& n, bool fSophieGermain, bool fFermatTest, unsigned int& nProbableChainLength, CPrimalityTestParams& testParams, bool doTrialDivision);
 
 // Test probable prime chain for: nOrigin
 // Return value:
@@ -321,19 +377,70 @@ bool ProbablePrimeChainTestFast2(const mpz_class& mpzPrimeChainOrigin, CPrimalit
 	nChainLengthCunningham2 = 0;
 	nChainLengthBiTwin = 0;
 
-	bool testCFirstKind = ((sieveFlags&SIEVE_FLAG_BT_COMPOSITE)!=0) || ((sieveFlags&SIEVE_FLAG_C2_COMPOSITE)!=0); // yes, C1 and C2 is switched
-	bool testCSecondKind = ((sieveFlags&SIEVE_FLAG_BT_COMPOSITE)!=0) || ((sieveFlags&SIEVE_FLAG_C1_COMPOSITE)!=0);
+	//sieveFlags = 0; // note: enabling the sieve optimization seems to decrease the rate of shares (remove this line to enable this future for non-gpu mode)
+
+	bool testCFirstKind = ((sieveFlags&SIEVE_FLAG_BT_COMPOSITE)==0) || ((sieveFlags&SIEVE_FLAG_C1_COMPOSITE)==0); // yes, C1 and C2 are switched
+	bool testCSecondKind = ((sieveFlags&SIEVE_FLAG_BT_COMPOSITE)==0) || ((sieveFlags&SIEVE_FLAG_C2_COMPOSITE)==0);
+
+	bool testCFirstFast = (sieveFlags&SIEVE_FLAG_C1_COMPOSITE)!=0; // should be !=0?
+	bool testCSecondFast = (sieveFlags&SIEVE_FLAG_C2_COMPOSITE)!=0;
+
+	mpzOriginMinusOne = mpzPrimeChainOrigin - 1; // first kind origin
+	mpzOriginPlusOne = mpzPrimeChainOrigin + 1; // second kind origin
+
+	// detailed test
+
+	//if( testCFirstKind && testCFirstFast == true ) //(sieveFlags&SIEVE_FLAG_C1_COMPOSITE)==0 )
+	//{
+	//	for(uint32 i=0; i<5000; i++)
+	//	{
+	//		if( mpz_tdiv_ui(mpzOriginMinusOne.get_mpz_t(), vPrimes[i]) == 0 )
+	//			__debugbreak();
+	//	}
+	//}
+	//if( testCSecondKind && testCSecondFast == true )//(sieveFlags&SIEVE_FLAG_C2_COMPOSITE)==0 )
+	//{
+	//	for(uint32 i=0; i<5000; i++)
+	//	{
+	//		if( mpz_tdiv_ui(mpzOriginPlusOne.get_mpz_t(), vPrimes[i]) == 0 )
+	//			__debugbreak();
+	//	}
+	//}
+
+
+	//printf("%d\n", fFermatTest?1:0);
 
 	// Test for Cunningham Chain of first kind
-	mpzOriginMinusOne = mpzPrimeChainOrigin - 1;
 	if( testCFirstKind )
-		ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, fFermatTest, nChainLengthCunningham1, testParams);
+	{
+		ProbableCunninghamChainTestFast(mpzOriginMinusOne, true, fFermatTest, nChainLengthCunningham1, testParams, testCFirstFast);
+	
+		//if( nChainLengthCunningham1 >= 0x04000000 )
+		//{
+		//	//__debugbreak();
+		//	mpz_class mpz_r;
+		//	mpz_class mpz_n1 = mpzPrimeChainOrigin - 1;
+		//	mpz_class mpz_n2 = mpzPrimeChainOrigin*2 - 1;
+		//	mpz_class mpz_n3 = mpzPrimeChainOrigin*4 - 1;
+		//	mpz_class mpz_n4 = mpzPrimeChainOrigin*8 - 1;
+		//	mpz_class mpz_e = mpz_n3 - 1;
+		//	mpz_class mpz_m = mpz_n1 * mpz_n2 * mpz_n3 * mpz_n4;
+		//	mpz_powm(mpz_r.get_mpz_t(), mpzTwo.get_mpz_t(), mpz_e.get_mpz_t(), mpz_m.get_mpz_t());
+
+		//	bool isPrime = (mpz_r.get_mpz_t()->_mp_d[0]&0xFF)==0xFF;
+		//	printf("%08X isPrime: %s	D: %016X\n", nChainLengthCunningham1, isPrime?"yes":"no", mpz_r.get_mpz_t()->_mp_d[0]);
+		//	if( isPrime == false )
+		//		__debugbreak();
+		//	//__debugbreak();
+
+
+		//}
+	}
 	else
 		nChainLengthCunningham1 = 0;
 	// Test for Cunningham Chain of second kind
-	mpzOriginPlusOne = mpzPrimeChainOrigin + 1;
 	if( testCSecondKind )
-		ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, fFermatTest, nChainLengthCunningham2, testParams);
+		ProbableCunninghamChainTestFast(mpzOriginPlusOne, false, fFermatTest, nChainLengthCunningham2, testParams, testCSecondFast);
 	else
 		nChainLengthCunningham2 = 0;
 	//// do we need to flag some bits as composite to avoid redundant chain checks?
@@ -382,40 +489,45 @@ bool BitcoinMiner2_mineProbableChain(primecoinBlock_t* block, mpz_class& mpzFixe
 	// Allocate GMP variables for primality tests
 	CPrimalityTestParams testParams(block->nBits, nPrimorialSeq);
 	{
-		unsigned long lDivisor = 1;
-		unsigned int i;
-		testParams.vFastDivSeq.push_back(nPrimorialSeq);
-		for (i = 1; i <= nFastDivPrimes; i++)
-		{
-			// Multiply primes together until the result won't fit an unsigned long
-			if (lDivisor < ULONG_MAX / vPrimes[nPrimorialSeq + i])
-				lDivisor *= vPrimes[nPrimorialSeq + i];
-			else
-			{
-				testParams.vFastDivisors.push_back(lDivisor);
-				testParams.vFastDivSeq.push_back(nPrimorialSeq + i);
-				lDivisor = 1;
-			}
-		}
+		//unsigned long lDivisor = 1;
+		//unsigned int i;
+		//testParams.vFastDivSeq.push_back(nPrimorialSeq);
+		//unsigned long primeIdx = nPrimorialSeq;
+		//unsigned long pStart = primeIdx;
+		//for (i = 1; i <= nFastDivPrimes; i++)
+		//{
+		//	// Multiply primes together until the result won't fit an unsigned long
+		//	if (lDivisor < ULONG_MAX / vPrimes[primeIdx])
+		//	{
+		//		lDivisor *= vPrimes[primeIdx];
+		//		primeIdx++;
+		//	}
+		//	else
+		//	{
+		//		// cannot multiply anymore
+		//		testParams.vFastDivisors.push_back(lDivisor);
+		//		testParams.vFastDivSeq.push_back(primeIdx);
+		//		lDivisor = 1;
+		//		pStart = primeIdx;
+		//	}
+		//	testParams.nFastDivisorsSize = testParams.vFastDivSeq.size() - 1;
+		//}
 
 		// Finish off by multiplying as many primes as possible
-		while (lDivisor < ULONG_MAX / vPrimes[nPrimorialSeq + i])
+		/*while (lDivisor < ULONG_MAX / vPrimes[nPrimorialSeq + i])
 		{
 			lDivisor *= vPrimes[nPrimorialSeq + i];
 			i++;
 		}
 		testParams.vFastDivisors.push_back(lDivisor);
 		testParams.vFastDivSeq.push_back(nPrimorialSeq + i);
-		testParams.nFastDivisorsSize = testParams.vFastDivisors.size();
+		testParams.nFastDivisorsSize = testParams.vFastDivisors.size();*/
 	}
 	// References to counters;
 	unsigned int& nChainLengthCunningham1 = testParams.nChainLengthCunningham1;
 	unsigned int& nChainLengthCunningham2 = testParams.nChainLengthCunningham2;
 	unsigned int& nChainLengthBiTwin = testParams.nChainLengthBiTwin;
 
-	uint32 debugStats_primes = 0;
-	uint32 debugStats_multipliersTested = 0;
-	
 	while( block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex) )
 	{
 		uint32 sieveFlags;
@@ -423,16 +535,9 @@ bool BitcoinMiner2_mineProbableChain(primecoinBlock_t* block, mpz_class& mpzFixe
 		if( multiplier == 0 )
 		{
 			// mix in next layer
-			//printf("Layer finished [%d]\n", cSieve->currentSieveLayerIdx);
 			if( cSieve_sieveNextLayer() == false )
 				break;
 			mpzFinalFixedMultiplier = cSieve->mpzFixedMultiplier;
-			//printf("[%02d] debugStats_multipliersTested: %d\n", cSieve->currentSieveLayerIdx, debugStats_multipliersTested);
-			//printf("[%02d] debugStats_primes: %d\n", cSieve->currentSieveLayerIdx, debugStats_primes);
-			//double primality = (double)debugStats_primes / (double)debugStats_multipliersTested;
-			//printf("[%02d] debugStats_primality: %lf\n", cSieve->currentSieveLayerIdx, primality);
-			debugStats_primes = 0;
-			debugStats_multipliersTested = 0;
 			continue;
 		}
 		 
@@ -499,8 +604,9 @@ bool BitcoinMiner2_mineProbableChain(primecoinBlock_t* block, mpz_class& mpzFixe
 		nProbableChainLength = max(max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
 
 		if( nProbableChainLength >= 0x01000000 )
-			debugStats_primes++;
-		debugStats_multipliersTested++;
+			primeStats.numPrimeCandidates++;
+		primeStats.numTestedCandidates++;
+		//debugStats_multipliersTested++;
 		//bool canSubmitAsShare = ProbablePrimeChainTestFast(mpzChainOrigin, testParams);
 		//CBigNum bnChainOrigin;
 		//bnChainOrigin.SetHex(mpzChainOrigin.get_str(16));
@@ -510,21 +616,21 @@ bool BitcoinMiner2_mineProbableChain(primecoinBlock_t* block, mpz_class& mpzFixe
 
 		if( nProbableChainLength >= 0x04000000 )
 		{
-			sint32 chainDif = (nProbableChainLength>>24) - 7;
-			primeStats.nChainHit += pow(8, (float)chainDif);
+			sint32 chainDif = (nProbableChainLength>>24) - 4;
+			uint64 chainDifInt = (uint64)pow(10.0, (double)chainDif);
+			primeStats.nChainHit += chainDifInt;
 			//primeStats.nChainHit += pow(8, ((float)((double)nProbableChainLength  / (double)0x1000000))-7.0);
 			//primeStats.nChainHit += pow(8, floor((float)((double)nProbableChainLength  / (double)0x1000000)) - 7);
-			nTests = 0;
-			primeStats.fourChainCount ++;
-			if (nProbableChainLength >= 0x5000000)
-			{
+			if (nProbableChainLength >= 0x7000000)
+				primeStats.sevenChainCount ++;
+			else if (nProbableChainLength >= 0x6000000)
+				primeStats.sixChainCount ++;
+			else if (nProbableChainLength >= 0x5000000)
 				primeStats.fiveChainCount ++;
-				if (nProbableChainLength >= 0x6000000)
-				{
-					primeStats.sixChainCount ++;
-					if (nProbableChainLength >= 0x7000000)
-						primeStats.sevenChainCount ++;
-				}
+			else if (nProbableChainLength >= 0x4000000)
+			{
+				nTests = 0;
+				primeStats.fourChainCount ++;
 			}
 		}
 		//if( nBitsGen >= 0x03000000 )
@@ -565,54 +671,33 @@ bool BitcoinMiner2_mineProbableChain(primecoinBlock_t* block, mpz_class& mpzFixe
 			timeinfo = localtime (&now);
 			char sNow [80];
 			strftime (sNow, 80, "%x - %X",timeinfo);
-
 			printf("%s - SHARE FOUND !!! (Th#: %u Multiplier: %d Layer: %d) ---  DIFF: %f    %s    %s\n", 
 				sNow, threadIndex, multiplier, cSieve->currentSieveLayerIdx, (float)((double)nProbableChainLength  / (double)0x1000000), 
 				nProbableChainLength >= 0x6000000 ? ">6":"", nProbableChainLength >= 0x7000000 ? ">7":"");
-
 			// submit this share
 			if (jhMiner_pushShare_primecoin(blockRawData, block))
 				primeStats.foundShareCount ++;
-			//printf("Probable prime chain found for block=%s!!\n  Target: %s\n  Length: (%s %s %s)\n", block.GetHash().GetHex().c_str(),TargetToString(block.nBits).c_str(), TargetToString(nChainLengthCunningham1).c_str(), TargetToString(nChainLengthCunningham2).c_str(), TargetToString(nChainLengthBiTwin).c_str());
-			//nProbableChainLength = max(max(nChainLengthCunningham1, nChainLengthCunningham2), nChainLengthBiTwin);
-			// since we are using C structs here we have to make sure the memory for the CBigNum in the block is freed again
-			//delete *psieve;
-			//*psieve = NULL;
-			//block->bnPrimeChainMultiplier = NULL;
 			RtlZeroMemory(blockRawData, 256);
-			//delete *psieve;
-			//*psieve = NULL;
 			// dont quit if we find a share, there could be other shares in the remaining prime candidates
 			nTests = 0;   // tehere is a good chance to find more shares so search a litle more.
-			//block->nonce++;
-			//return true;
-			//break;
-			//if (multipleShare)
 		}
 	}
 	//__debugbreak();
 	return false;
 }
 
-
-void BitcoinMiner2(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
+void BitcoinMiner_multipassSieve(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 {
 	if( pctx == NULL )
 		pctx = BN_CTX_new();
 	unsigned int nExtraNonce = 0;
 
-	static const unsigned int nPrimorialHashFactor = 7;
-	const unsigned int nPrimorialMultiplierStart = 61;   
-	const unsigned int nPrimorialMultiplierMax = 79;
-
+	static const unsigned int nPrimorialHashFactor = 11;//7 11;
 	unsigned int nPrimorialMultiplier = primeStats.nPrimorialMultiplier;
 	int64 nTimeExpected = 0;   // time expected to prime chain (micro-second)
 	int64 nTimeExpectedPrev = 0; // time expected to prime chain last time
 	bool fIncrementPrimorial = true; // increase or decrease primorial factor
 	int64 nSieveGenTime = 0;
-
-
-	CSieveOfEratosthenes* psieve = NULL;
 
 	if( primecoinBlock->xptMode )
 		primecoinBlock->nonce = 0; // xpt guarantees unique merkleRoot hashes for each thread
@@ -663,14 +748,14 @@ void BitcoinMiner2(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		mpz_class mpzHash;
 		mpz_set_uint256(mpzHash.get_mpz_t(), phash);
 
-		while ((phash < hashBlockHeaderLimit || !mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor)) && primecoinBlock->nonce < 0xffff0000) {
+		while ((phash < hashBlockHeaderLimit || !mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor)) && primecoinBlock->nonce < 0xf0000000) {
 			primecoinBlock->nonce++;
 			primecoinBlock_generateHeaderHash(primecoinBlock, primecoinBlock->blockHeaderHash.begin());
 			phash = primecoinBlock->blockHeaderHash;
 			mpz_set_uint256(mpzHash.get_mpz_t(), phash);
 		}
 		//printf("Use nonce %d\n", primecoinBlock->nonce);
-		if (primecoinBlock->nonce >= 0xffff0000)
+		if (primecoinBlock->nonce >= 0xf0000000)
 		{
 			printf("Nonce overflow\n");
 			break;
@@ -700,7 +785,9 @@ void BitcoinMiner2(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 				error("PrimecoinMiner() : primorial minimum overflow");
 			Primorial(nPrimorialMultiplier, mpzPrimorial);
 		}
-		mpz_class mpzFixedMultiplier = mpzPrimorial;
+		//if( mpz_divisible_ui_p(mpzPrimorial.get_mpz_t(), nHashFactor) )
+		//	__debugbreak();
+		mpz_class mpzFixedMultiplier = mpzPrimorial / nHashFactor;
 		/*if (mpzPrimorial > nHashFactor) {
 			mpzFixedMultiplier = mpzPrimorial / nHashFactor;
 		} else {
@@ -720,7 +807,7 @@ void BitcoinMiner2(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		if (fNewBlock)
 		{
 		}
-
+		
 
 		primecoinBlock->nonce++;
 		primecoinBlock->timestamp = max(primecoinBlock->timestamp, (unsigned int) time(NULL));
