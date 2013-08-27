@@ -772,13 +772,11 @@ bool BitcoinMinerOpenCL_mineProbableChain(primecoinBlock_t* block, mpz_class& mp
 			if( nProbableChainLength > primeStats.bestPrimeChainDifficulty )
 				primeStats.bestPrimeChainDifficulty = nProbableChainLength;
 
-			if(nProbableChainLength >= block->serverData.nBitsForShare)
+			if(nProbableChainLength >= block->nBitsForShare)
 			{
 				// note: mpzPrimeChainMultiplier does not include the blockHash multiplier
 				mpz_div(block->mpzPrimeChainMultiplier.get_mpz_t(), mpzChainOrigin.get_mpz_t(), mpzHash.get_mpz_t());
 				//mpz_lsh(block->mpzPrimeChainMultiplier.get_mpz_t(), mpzFixedMultiplier.get_mpz_t(), multiplier);
-				// update server data
-				block->serverData.client_shareBits = nProbableChainLength;
 				// generate block raw data
 				uint8 blockRawData[256] = {0};
 				memcpy(blockRawData, block, 80);
@@ -847,11 +845,7 @@ void BitcoinMiner_openCL(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		pctx = BN_CTX_new();
 	unsigned int nExtraNonce = 0;
 
-	static const unsigned int nPrimorialHashFactor = 7;
-	const unsigned int nPrimorialMultiplierStart = 61;   
-	const unsigned int nPrimorialMultiplierMax = 79;
-
-	unsigned int nPrimorialMultiplier = primeStats.nPrimorialMultiplier;
+	unsigned int nPrimorialMultiplier = primecoinBlock->fixedPrimorial;
 	int64 nTimeExpected = 0;   // time expected to prime chain (micro-second)
 	int64 nTimeExpectedPrev = 0; // time expected to prime chain last time
 	bool fIncrementPrimorial = true; // increase or decrease primorial factor
@@ -869,14 +863,14 @@ void BitcoinMiner_openCL(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 
 	//mpz_class mpzHashFactor;
 	//Primorial(nPrimorialHashFactor, mpzHashFactor);
-	unsigned int nHashFactor = PrimorialFast(nPrimorialHashFactor);
+	unsigned int nHashFactor = PrimorialFast(primecoinBlock->fixedHashFactor);
 
 	time_t unixTimeStart;
 	time(&unixTimeStart);
 	uint32 nTimeRollStart = primecoinBlock->timestamp;
 
 	uint32 nCurrentTick = GetTickCount();
-	while( primecoinBlock->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(primecoinBlock->threadIndex) )
+	while( primecoinBlock->blockHeight == jhMiner_getCurrentWorkBlockHeight(primecoinBlock->threadIndex) )
 	{
 		nCurrentTick = GetTickCount();
 		//if( primecoinBlock->xptMode )
@@ -958,7 +952,6 @@ void BitcoinMiner_openCL(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		//psieve = NULL;
 		nRoundTests += nTests;
 		nRoundPrimesHit += nPrimesHit;
-		nPrimorialMultiplier = primeStats.nPrimorialMultiplier;
 		// added this
 		if (fNewBlock)
 		{

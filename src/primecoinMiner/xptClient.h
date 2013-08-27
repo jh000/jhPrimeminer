@@ -32,11 +32,11 @@ typedef struct
 	// disconnect info
 	bool disconnected;
 	char* disconnectReason;
-	// work data
-	uint32 workDataCounter; // timestamp of when received the last block of work data
-	bool workDataValid;
-	xptBlockWorkInfo_t blockWorkInfo;
-	xptWorkData_t workData[128]; // size equal to max payload num
+	// work data (queue)
+	CRITICAL_SECTION cs_workAccess;
+	xptBlockWorkInfo_t blockWorkInfo[400]; // queue for 400 work jobs, maybe replace with dynamic struct later
+	uint32 blockWorkSize;
+	float earnedShareValue; // this value is sent by the server with each new block that is sent
 	// shares to submit
 	CRITICAL_SECTION cs_shareSubmit;
 	simpleList_t* list_shareSubmitQueue;
@@ -58,3 +58,7 @@ void xptClient_sendWorkerLogin(xptClient_t* xptClient);
 bool xptClient_processPacket_authResponse(xptClient_t* xptClient);
 bool xptClient_processPacket_blockData1(xptClient_t* xptClient);
 bool xptClient_processPacket_shareAck(xptClient_t* xptClient);
+bool xptClient_processPacket_message(xptClient_t* xptClient);
+
+// miner version string (needs to be defined somewhere in the project, max 45 characters)
+extern char* minerVersionString;

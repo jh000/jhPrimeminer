@@ -21,7 +21,20 @@ typedef struct
 	uint32 nTime;
 	uint32 nBits;
 	uint32 nBitsShare;
-	uint8 prevBlock[32];
+	uint8 merkleRoot[32];
+	uint8 prevBlockHash[32];
+	// constraints from server
+	uint32 fixedPrimorial;
+	uint32 fixedHashFactor;
+	uint32 sievesizeMin;
+	uint32 sievesizeMax;
+	uint32 primesToSieveMin;
+	uint32 primesToSieveMax;
+	uint32 sieveChainLength; // the chainlength we have to sieve for
+	uint32 nonceMin;
+	uint32 nonceMax;
+	// workbundle flags
+	uint32 flags;
 }xptBlockWorkInfo_t;
 
 typedef struct _xptServer_t 
@@ -76,6 +89,8 @@ typedef struct
 #define XPT_OPC_S_WORKDATA1		3
 #define XPT_OPC_C_SUBMIT_SHARE	4
 #define XPT_OPC_S_SHARE_ACK		5
+#define XPT_OPC_C_SUBMIT_POW	6
+#define XPT_OPC_S_MESSAGE		7
 
 // list of error codes
 
@@ -83,6 +98,11 @@ typedef struct
 #define XPT_ERROR_INVALID_LOGIN		(1)
 #define XPT_ERROR_INVALID_WORKLOAD	(2)
 #define XPT_ERROR_INVALID_COINTYPE	(3)
+
+// list of flags
+
+#define XPT_WORKBUNDLE_FLAG_TIMESTAMPROLL	(1<<0) // timestamp updating is allowed (if not set, stop processing when full nonce range is exhausted)
+#define XPT_WORKBUNDLE_FLAG_INTERRUPTABLE	(1<<1) // interrupt when work with a greater block height arrived
 
 // xpt general
 xptServer_t* xptServer_create(uint16 port);

@@ -46,7 +46,7 @@ bool xptServer_sendBlockData(xptServer_t* xptServer, xptServerClient_t* xptServe
 	xptPacketbuffer_writeU32(xptServer->sendBuffer, &sendError, blockWorkInfo.nBits);				// nBits
 	xptPacketbuffer_writeU32(xptServer->sendBuffer, &sendError, blockWorkInfo.nBitsShare);			// nBitsRecommended / nBitsShare
 	xptPacketbuffer_writeU32(xptServer->sendBuffer, &sendError, blockWorkInfo.nTime);				// nTimestamp
-	xptPacketbuffer_writeData(xptServer->sendBuffer, blockWorkInfo.prevBlock, 32, &sendError);		// prevBlockHash
+	xptPacketbuffer_writeData(xptServer->sendBuffer, blockWorkInfo.prevBlockHash, 32, &sendError);	// prevBlockHash
 	xptPacketbuffer_writeU32(xptServer->sendBuffer, &sendError, xptServerClient->payloadNum);		// payload num
 	for(uint32 i=0; i<xptServerClient->payloadNum; i++)
 	{

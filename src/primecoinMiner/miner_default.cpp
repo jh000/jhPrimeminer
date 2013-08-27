@@ -19,23 +19,38 @@ __declspec( thread ) pSieve_t* thread_pSieve = NULL;
 unsigned int int_invert(unsigned int a, unsigned int nPrime);
 extern uint32* vTwoInverses;
 
-void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor)
+void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, uint32 nSieveSize, uint32 nPrimesToSieve)
 {
 	pSieve_t* pSieve;
+	// align sieve size to 64 (so we can process multipliers in 64 bit integers)
+	nSieveSize = (nSieveSize+63)&~63;
+	// do we need to free the sieve?
+	if( thread_pSieve && (thread_pSieve->nSieveSize != nSieveSize) )
+	{
+		// free sieve - parameters changed
+		free(thread_pSieve->vfCandidatesC1);
+		free(thread_pSieve->vfCandidatesC2);
+		free(thread_pSieve->vfCandidatesBt);
+		free(thread_pSieve);
+		thread_pSieve = NULL;
+	}
+	// allocate and init sieve
 	if( thread_pSieve == NULL )
 	{
 		thread_pSieve = (pSieve_t*)malloc(sizeof(pSieve_t));
 		memset(thread_pSieve, 0x00, sizeof(pSieve_t));
 		pSieve = thread_pSieve;
-		pSieve->nSieveSize = minerSettings.nSieveSize;
-		pSieve->nSieveSize = (pSieve->nSieveSize+63)&~63; // align to 8 byte
-		pSieve->nPrimesToSieve = minerSettings.nPrimesToSieve;
+		pSieve->nSieveSize = nSieveSize;
+		pSieve->nPrimesToSieve = nPrimesToSieve;
 		pSieve->vfCandidatesC1 = (uint8*)malloc(pSieve->nSieveSize/8 + 1256*2);
 		pSieve->vfCandidatesC2 = (uint8*)malloc(pSieve->nSieveSize/8 + 1256*2);
 		pSieve->vfCandidatesBt = (uint8*)malloc(pSieve->nSieveSize/8 + 1256*2);
 	}
 	else
 		pSieve = thread_pSieve;
+
+	// make sure primesToSieve is correct (doesn't need full sieve reset)
+	pSieve->nPrimesToSieve = nPrimesToSieve;
 
 	memset(pSieve->vfCandidatesC1, 0x00, pSieve->nSieveSize/8);
 	memset(pSieve->vfCandidatesC2, 0x00, pSieve->nSieveSize/8);
@@ -44,9 +59,6 @@ void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor)
 	const unsigned int nChainLength = TargetGetLength(nBits);
 	unsigned int nPrimeSeq = 0;
 	//unsigned int vPrimesSize2 = vPrimesSize;
-
-	// Keep all variables local for max performance
-	unsigned int nSieveSize = pSieve->nSieveSize;
 
 	// Process only 10% of the primes
 	// Most composites are still found
@@ -301,6 +313,11 @@ uint32 pSieve_nextMultiplier(uint32* sieveFlags)
 	return 0;
 }
 
+__declspec( thread ) uint32 proofOfWork_maxChainlength;
+__declspec( thread ) uint32 proofOfWork_nonce;
+__declspec( thread ) uint32 proofOfWork_multiplier;
+__declspec( thread ) uint32 proofOfWork_depth;
+__declspec( thread ) uint32 proofOfWork_chainType; // 0 -> Cunningham first kind, 1 -> Cunningham second kind, 2 -> bitwin
 
 bool MineProbablePrimeChain(primecoinBlock_t* block, mpz_class& mpzFixedMultiplier, bool& fNewBlock, unsigned int& nTriedMultiplier, unsigned int& nProbableChainLength,
 							unsigned int& nTests, unsigned int& nPrimesHit, sint32 threadIndex, mpz_class& mpzHash, unsigned int nPrimorialMultiplier)
@@ -314,7 +331,9 @@ bool MineProbablePrimeChain(primecoinBlock_t* block, mpz_class& mpzFixedMultipli
 	mpz_class mpzHashMultiplier = mpzHash * mpzFixedMultiplier;
 	mpz_class mpzChainOrigin;
 
-	pSieve_prepare(block->nBits, block->nBits, &mpzHashMultiplier);
+	uint32 nSieveSize = max(block->sievesizeMin, min(block->sievesizeMax, minerSettings.nSieveSize));
+	uint32 nPrimesToSieve = max(block->primesToSieveMin, min(block->primesToSieveMax, minerSettings.nPrimesToSieve));
+	pSieve_prepare(block->nBits, block->nBits, &mpzHashMultiplier, nSieveSize, nPrimesToSieve);
 
 	// Determine the sequence number of the round primorial
 	unsigned int nPrimorialSeq = 0;
@@ -364,12 +383,17 @@ bool MineProbablePrimeChain(primecoinBlock_t* block, mpz_class& mpzFixedMultipli
 	//int nTries = 0;
 	//bool multipleShare = false;
 
+
+
+
+	
+
 	uint32 sieveFlags;
 	uint32 numMultipliers = 0;
 	uint32 goodChains = 0;
 	primeStats.numAllTestedNumbers += (minerSettings.nSieveSize);
 	uint32 prevMultiplier;
-	while ( block->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex))
+	while ( (block->xptFlags&XPT_WORKBUNDLE_FLAG_INTERRUPTABLE) || block->blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex) )
 	{
 		prevMultiplier = nTriedMultiplier;
 		nTriedMultiplier = pSieve_nextMultiplier(&sieveFlags);
@@ -477,7 +501,20 @@ bool MineProbablePrimeChain(primecoinBlock_t* block, mpz_class& mpzFixedMultipli
 		//	if( goodChains == 0 )
 		//		break;
 		//}
-		
+		if( nProbableChainLength >= proofOfWork_maxChainlength )
+		{
+			proofOfWork_maxChainlength = nProbableChainLength;
+			proofOfWork_multiplier = nTriedMultiplier;
+			proofOfWork_nonce = block->nonce;
+			proofOfWork_depth = 0; // doing no depth scan (multipass sieve only)
+			// get chaintype
+			if( nChainLengthCunningham1 >= nProbableChainLength )
+				proofOfWork_chainType = 0; // Cunningham first kind
+			else if( nChainLengthCunningham2 >= nProbableChainLength )
+				proofOfWork_chainType = 1; // Cunningham first kind
+			else
+				proofOfWork_chainType = 2; // bitwin chain
+		}
 		if( nProbableChainLength >= 0x03000000 )
 		{
 			goodChains++;
@@ -503,13 +540,11 @@ bool MineProbablePrimeChain(primecoinBlock_t* block, mpz_class& mpzFixedMultipli
 		if( nProbableChainLength > primeStats.bestPrimeChainDifficulty )
 			primeStats.bestPrimeChainDifficulty = nProbableChainLength;
 
-		if(nProbableChainLength >= block->serverData.nBitsForShare)
+		if(nProbableChainLength >= block->nBitsForShare)
 		{
 			//primeStats.shareFound = true;
 
 			block->mpzPrimeChainMultiplier = mpzFixedMultiplier * nTriedMultiplier;
-			// update server data
-			block->serverData.client_shareBits = nProbableChainLength;
 			// generate block raw data
 			uint8 blockRawData[256] = {0};
 			memcpy(blockRawData, block, 80);
@@ -576,8 +611,8 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 	//CReserveKey reservekey(pwallet);
 	unsigned int nExtraNonce = 0;
 
-	static const unsigned int nPrimorialHashFactor = 7;
-	unsigned int nPrimorialMultiplier = primeStats.nPrimorialMultiplier;
+	//static const unsigned int nPrimorialHashFactor = 7;
+	unsigned int nPrimorialMultiplier = primecoinBlock->fixedPrimorial;
 	int64 nTimeExpected = 0;   // time expected to prime chain (micro-second)
 	int64 nTimeExpectedPrev = 0; // time expected to prime chain last time
 	bool fIncrementPrimorial = true; // increase or decrease primorial factor
@@ -587,45 +622,42 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 	//TODO: check this if it makes sense
 	if( primecoinBlock->xptMode == false )
 		primecoinBlock->nonce = 0x00010000 * threadIndex;
+	else
+		primecoinBlock->nonce = primecoinBlock->nonceMin;
 	//primecoinBlock->nonce = 0;
 
 	uint32 nTime = GetTickCount() + 1000*600;
 
 	uint32 nStatTime = GetTickCount() + 2000;
 
-	// note: originally a wanted to loop as long as (primecoinBlock->workDataHash != jhMiner_getCurrentWorkHash()) did not happen
-	//		 but I noticed it might be smarter to just check if the blockHeight has changed, since that is what is really important
 	uint32 loopCount = 0;
+	unsigned int nHashFactor;
+	if( primecoinBlock->fixedHashFactor )
+		nHashFactor = PrimorialFast(primecoinBlock->fixedHashFactor);
+	else
+		nHashFactor = 0;
 
-	//mpz_class mpzHashFactor;
-	//Primorial(nPrimorialHashFactor, mpzHashFactor);
-	unsigned int nHashFactor = PrimorialFast(nPrimorialHashFactor);
+	//uint32 nTimeRollStart = primecoinBlock->timestamp;
 
-	time_t unixTimeStart;
-	time(&unixTimeStart);
-	uint32 nTimeRollStart = primecoinBlock->timestamp;
 
-	uint32 nCurrentTick = GetTickCount();
-	uint32 nTimeRollBase = time(NULL);
-	while( primecoinBlock->serverData.blockHeight == jhMiner_getCurrentWorkBlockHeight(primecoinBlock->threadIndex) )
+	// start proof of work generation
+	uint32 nSieveSize = max(primecoinBlock->sievesizeMin, min(primecoinBlock->sievesizeMax, minerSettings.nSieveSize));
+	uint32 nPrimesToSieve = max(primecoinBlock->primesToSieveMin, min(primecoinBlock->primesToSieveMax, minerSettings.nPrimesToSieve));
+	jhMiner_primecoinBeginProofOfWork(primecoinBlock->merkleRoot, primecoinBlock->prevBlockHash, nSieveSize, nPrimesToSieve, primecoinBlock->timestamp);
+	
+	// reset proof of work hash
+	proofOfWork_maxChainlength = 0;
+	uint32 numberOfProcessedSieves = 0;
+
+	mpz_class mpzPrimorial;
+	Primorial(nPrimorialMultiplier, mpzPrimorial);
+	while( true )
 	{
-		nCurrentTick = GetTickCount();
-		//if( primecoinBlock->xptMode )
-		//{
-		//	// when using x.pushthrough, roll time
-		//	time_t unixTimeCurrent;
-		//	time(&unixTimeCurrent);
-		//	uint32 timeDif = unixTimeCurrent - unixTimeStart;
-		//	uint32 newTimestamp = nTimeRollStart + timeDif;
-		//	if( newTimestamp != primecoinBlock->timestamp )
-		//	{
-		//		primecoinBlock->timestamp = newTimestamp;
-		//		primecoinBlock->nonce = 0;
-		//		//nPrimorialMultiplierStart = startFactorList[(threadIndex&3)];
-		//		nPrimorialMultiplier = nPrimorialMultiplierStart;
-		//	}
-		//}
-
+		if( primecoinBlock->xptFlags & XPT_WORKBUNDLE_FLAG_INTERRUPTABLE )
+		{
+			if( primecoinBlock->blockHeight != jhMiner_getCurrentWorkBlockHeight(primecoinBlock->threadIndex) )
+				break;
+		}
 		primecoinBlock_generateHeaderHash(primecoinBlock, primecoinBlock->blockHeaderHash.begin());
 		//
 		// Search
@@ -637,20 +669,40 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		mpz_class mpzHash;
 		mpz_set_uint256(mpzHash.get_mpz_t(), phash);
 
-		while ((phash < hashBlockHeaderLimit || !mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor)) && primecoinBlock->nonce < 0xfff00000) {
-			primecoinBlock->nonce++;
-			primecoinBlock_generateHeaderHash(primecoinBlock, primecoinBlock->blockHeaderHash.begin());
-			phash = primecoinBlock->blockHeaderHash;
-			mpz_set_uint256(mpzHash.get_mpz_t(), phash);
-		}
-		//printf("Use nonce %d\n", primecoinBlock->nonce);
-		if (primecoinBlock->nonce >= 0xfff00000)
+		if( nHashFactor > 0 ) 
 		{
-			printf("Nonce overflow\n");
-			break;
+			while ((phash < hashBlockHeaderLimit || !mpz_divisible_ui_p(mpzHash.get_mpz_t(), nHashFactor)) && primecoinBlock->nonce < primecoinBlock->nonceMax) {
+				primecoinBlock->nonce++;
+				primecoinBlock_generateHeaderHash(primecoinBlock, primecoinBlock->blockHeaderHash.begin());
+				phash = primecoinBlock->blockHeaderHash;
+				mpz_set_uint256(mpzHash.get_mpz_t(), phash);
+			}
+		}
+		else
+		{
+			while ((phash < hashBlockHeaderLimit || !mpz_probab_prime_p(mpzHash.get_mpz_t(), 8)) && primecoinBlock->nonce < primecoinBlock->nonceMax) {
+				primecoinBlock->nonce++;
+				primecoinBlock_generateHeaderHash(primecoinBlock, primecoinBlock->blockHeaderHash.begin());
+				phash = primecoinBlock->blockHeaderHash;
+				mpz_set_uint256(mpzHash.get_mpz_t(), phash);
+			}
+		}
+		// did we reach the end of the nonce range?
+		if (primecoinBlock->nonce >= primecoinBlock->nonceMax)
+		{
+			jhMiner_primecoinAddProofOfWork(primecoinBlock->merkleRoot, primecoinBlock->prevBlockHash, numberOfProcessedSieves, primecoinBlock->timestamp, proofOfWork_maxChainlength, proofOfWork_chainType, proofOfWork_nonce, proofOfWork_multiplier, proofOfWork_depth);
+			numberOfProcessedSieves = 0;
+			proofOfWork_maxChainlength = 0;
+			proofOfWork_multiplier = 0;
+			proofOfWork_nonce = 0;
+			proofOfWork_depth = 0;
+			if( (primecoinBlock->xptFlags & XPT_WORKBUNDLE_FLAG_TIMESTAMPROLL) == 0 )
+				break;
+			// do timestamp roll (xpt rule: Dont skip timestamp values)
+			primecoinBlock->timestamp++;
+			primecoinBlock->nonce = primecoinBlock->nonceMin;
 		}
 		// Primecoin: primorial fixed multiplier
-		mpz_class mpzPrimorial;
 		unsigned int nRoundTests = 0;
 		unsigned int nRoundPrimesHit = 0;
 		int64 nPrimeTimerStart = GetTickCount();
@@ -661,8 +713,6 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		//	if (!PrimeTableGetNextPrime(nPrimorialMultiplier))
 		//		error("PrimecoinMiner() : primorial increment overflow");
 		//}
-
-		Primorial(nPrimorialMultiplier, mpzPrimorial);
 
 		unsigned int nTests = 0;
 		unsigned int nPrimesHit = 0;
@@ -680,21 +730,22 @@ void BitcoinMiner(primecoinBlock_t* primecoinBlock, sint32 threadIndex)
 		// Primecoin: mine for prime chain
 		unsigned int nProbableChainLength;
 		MineProbablePrimeChain(primecoinBlock, mpzFixedMultiplier, fNewBlock, nTriedMultiplier, nProbableChainLength, nTests, nPrimesHit, threadIndex, mpzHash, nPrimorialMultiplier);
+		numberOfProcessedSieves++;
 		//psieve = NULL;
 		nRoundTests += nTests;
 		nRoundPrimesHit += nPrimesHit;
-		nPrimorialMultiplier = primeStats.nPrimorialMultiplier;
 		primecoinBlock->nonce++;
-		uint32 newTimestamp = nTimeRollStart + (unsigned int)time(NULL)-nTimeRollBase;
-		if( newTimestamp != primecoinBlock->timestamp )
-		{
-			primecoinBlock->timestamp = newTimestamp;
-			if( primecoinBlock->xptMode == false )
-				primecoinBlock->nonce = 0x00010000 * threadIndex;
-			else
-				primecoinBlock->nonce = 1;
-		}
+		// accurate time roll has been disabled (use timestamp update)
+		//uint32 newTimestamp = nTimeRollStart + (unsigned int)time(NULL)-nTimeRollBase;
+		//if( newTimestamp != primecoinBlock->timestamp )
+		//{
+		//	primecoinBlock->timestamp = newTimestamp;
+		//	if( primecoinBlock->xptMode == false )
+		//		primecoinBlock->nonce = 0x00010000 * threadIndex;
+		//	else
+		//		primecoinBlock->nonce = 1;
+		//}
 		loopCount++;
 	}
-
+	jhMiner_primecoinCompleteProofOfWork(primecoinBlock->merkleRoot, primecoinBlock->prevBlockHash, primecoinBlock->nonce, numberOfProcessedSieves, primecoinBlock->timestamp, proofOfWork_maxChainlength, proofOfWork_chainType, proofOfWork_nonce, proofOfWork_multiplier, proofOfWork_depth);
 }

@@ -113,7 +113,7 @@ typedef struct
 	/* +0x14 */ uint32 client_shareBits; // difficulty score of found share (the client is allowed to modify this value, but not the others)
 	/* +0x18 */ uint32 serverStuff1;
 	/* +0x1C */ uint32 serverStuff2;
-}serverData_t;
+}getwork_serverData_t;
 
 typedef struct  
 {
@@ -129,7 +129,7 @@ typedef struct
 	volatile uint32 cunninghamBiTwinCount;
 	volatile uint64 nChainHit;
 	volatile double nPrevChainHit;
-	volatile unsigned int nPrimorialMultiplier;
+	//volatile unsigned int nPrimorialMultiplier;
 	CRITICAL_SECTION cs;
 
 	// since we can generate many (useless) primes ultra fast if we simply set sieve size low, 
@@ -140,7 +140,6 @@ typedef struct
 	uint32 primeLastUpdate;
 	bool shareFound;
 	bool shareRejected;
-
 	// start for auto tuning
 	volatile uint32 numTestedCandidates;
 	volatile uint32 numPrimeCandidates;
@@ -162,9 +161,22 @@ typedef struct
 	CBigNum bnPrimeChainMultiplierBN;
 	mpz_class mpzPrimeChainMultiplier;
 	// other
-	serverData_t serverData;
+	uint32 nBitsForShare;
+	uint32 blockHeight;
 	uint32 threadIndex; // the index of the miner thread
 	bool xptMode;
+	// server constraints
+	uint32 fixedPrimorial; // 59 is recommended
+	uint32 fixedHashFactor; // if 0 -> block header hash must be prime
+	uint32 sievesizeMin;
+	uint32 sievesizeMax;
+	uint32 primesToSieveMin;
+	uint32 primesToSieveMax;
+	uint32 sieveChainLength; // the chainlength we have to sieve for, usually equal to integer part of network difficulty
+	uint32 nonceMin;
+	uint32 nonceMax;
+	// flags
+	uint32 xptFlags;
 }primecoinBlock_t;
 
 extern jsonRequestTarget_t jsonRequestTarget; // rpc login data
@@ -173,7 +185,6 @@ typedef struct
 {
 	sint32 nSieveSize;
 	sint32 nPrimesToSieve;
-	sint32 nPrimorialMultiplier;
 	sint32 sievePercentage;
 }minerSettings_t;
 
@@ -210,3 +221,8 @@ static inline uint32_t le32dec(const void *pp)
 
 void mallocSpeedupInit();
 void mallocSpeedupInitPerThread();
+
+// methods for collection of proof of work
+void jhMiner_primecoinBeginProofOfWork(uint8 merkleRoot[32], uint8 prevBlockHash[32], uint32 sieveSize, uint32 primesToSieve, uint32 timestampStart);
+void jhMiner_primecoinAddProofOfWork(uint8 merkleRoot[32], uint8 prevBlockHash[32], uint32 numberOfProcessedSieves, uint32 timestamp, uint32 proofChainLength, uint8 proofChainType, uint32 proofNonce, uint32 proofMultiplier, uint32 proofDepth);
+void jhMiner_primecoinCompleteProofOfWork(uint8 merkleRoot[32], uint8 prevBlockHash[32], uint32 nonceEnd, uint32 numberOfProcessedSieves, uint32 timestamp, uint32 proofChainLength, uint8 proofChainType, uint32 proofNonce, uint32 proofMultiplier, uint32 proofDepth);

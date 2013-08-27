@@ -763,11 +763,11 @@ bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPrimality
     nChainLengthCunningham2 = 0;
     nChainLengthBiTwin = 0;
 
-	bool testCFirstKind = ((sieveFlags&SIEVE_FLAG_BT_COMPOSITE)==0) || ((sieveFlags&SIEVE_FLAG_C2_COMPOSITE)==0); // yes, C1 and C2 is switched
-	bool testCSecondKind = ((sieveFlags&SIEVE_FLAG_BT_COMPOSITE)==0) || ((sieveFlags&SIEVE_FLAG_C1_COMPOSITE)==0);
+	bool testCFirstKind = ((sieveFlags&SIEVE_FLAG_BT_COMPOSITE)==0) || ((sieveFlags&SIEVE_FLAG_C1_COMPOSITE)==0);
+	bool testCSecondKind = ((sieveFlags&SIEVE_FLAG_BT_COMPOSITE)==0) || ((sieveFlags&SIEVE_FLAG_C2_COMPOSITE)==0);
 
-	bool testCFirstFast = ((sieveFlags&SIEVE_FLAG_C2_COMPOSITE)!=0);
-	bool testCSecondFast  ((sieveFlags&SIEVE_FLAG_C1_COMPOSITE)!=0);
+	bool testCFirstFast = ((sieveFlags&SIEVE_FLAG_C1_COMPOSITE)!=0);
+	bool testCSecondFast  ((sieveFlags&SIEVE_FLAG_C2_COMPOSITE)!=0);
 
     // Test for Cunningham Chain of first kind
     mpzOriginMinusOne = mpzPrimeChainOrigin - 1;
@@ -782,7 +782,7 @@ bool ProbablePrimeChainTestFast(const mpz_class& mpzPrimeChainOrigin, CPrimality
 	else
 		nChainLengthCunningham2 = 0;
 	// verify if there is any chance to find a biTwin that worth calculation
-	if (nChainLengthCunningham1 < 0x2000000 || nChainLengthCunningham2 < 0x2000000)
+	if (nChainLengthCunningham1 < 0x4000000 || nChainLengthCunningham2 < 0x4000000)
 		return (nChainLengthCunningham1 >= nBits || nChainLengthCunningham2 >= nBits);
 
     // Figure out BiTwin Chain length
