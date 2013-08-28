@@ -137,7 +137,7 @@ bool xptClient_processPacket_shareAck(xptClient_t* xptClient)
 	}
 	else
 	{
-		// error logging in -> disconnect
+		// share not accepted by server
 		total_shares++;
 		printf("Invalid share\n");
 		if( rejectReason[0] != '\0' )

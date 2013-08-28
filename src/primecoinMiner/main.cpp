@@ -33,10 +33,10 @@ char* dt;
 
 minerSettings_t minerSettings = {0};
 
-#define DEFAULT_SIEVE_SIZE			(1024*1024*2)//(1024*1024*4)
+#define DEFAULT_SIEVE_SIZE			(1024*2000)
 #define DEFAULT_PRIMES_TO_SIEVE		(35000)
 
-char* minerVersionString = "jhPrimeminer v0.5 r1 (official)"; // this is the version string displayed on the worker live stats page (max 45 characters)
+char* minerVersionString = "jhPrimeminer v0.5 r2 (official)"; // this is the version string displayed on the worker live stats page (max 45 characters)
 
 bool error(const char *format, ...)
 {
@@ -991,9 +991,7 @@ int jhMiner_main_xptMode()
 			if( statsPassedTime < 1.0 )
 				statsPassedTime = 1.0; // avoid division by zero
 			double numbersTestedPerSec = (double)primeStats.numAllTestedNumbers / (statsPassedTime / 1000.0);
-			numbersTestedPerSec *= 0.0001;
-			//primeStats.primeLastUpdate = GetTickCount();
-			//primeStats.primeChainsFound = 0;
+			numbersTestedPerSec *= 0.001;
 			uint32 bestDifficulty = primeStats.bestPrimeChainDifficulty;
 			primeStats.bestPrimeChainDifficulty = 0;
 			double primeDifficulty = (double)bestDifficulty / (double)0x1000000;
@@ -1074,6 +1072,7 @@ int jhMiner_main_xptMode()
 				printf("---- Total/Valid shares: [ %d / %d ]\n",valid_shares, total_shares);
 				printf("---- 6CH count: %u - 7CH count: %u - Max diff: %.005f\n", primeStats.sixChainCount, primeStats.sevenChainCount, (float)primeStats.bestPrimeChainDifficultySinceLaunch); 
 				printf("---- Server PrimorialMultiplier: %u\n", workData.workEntryQueue[workData.workEntrySize-1].fixedPrimorial);
+				printf("---- Server PrimorialHashFactor: %u\n", workData.workEntryQueue[workData.workEntrySize-1].fixedHashFactor);
 				printf("---- Allowed Sieverange: %u - %u\n", workData.workEntryQueue[workData.workEntrySize-1].sievesizeMin, workData.workEntryQueue[workData.workEntrySize-1].sievesizeMax);
 				printf("---- Allowed Primetestrange: %u - %u\n", workData.workEntryQueue[workData.workEntrySize-1].primesToSieveMin, workData.workEntryQueue[workData.workEntrySize-1].primesToSieveMax);
 				printf("---- Allowed Noncerange: %u - %u\n", workData.workEntryQueue[workData.workEntrySize-1].nonceMin, workData.workEntryQueue[workData.workEntrySize-1].nonceMax);

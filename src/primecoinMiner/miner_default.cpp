@@ -334,7 +334,6 @@ bool MineProbablePrimeChain(primecoinBlock_t* block, mpz_class& mpzFixedMultipli
 	uint32 nSieveSize = max(block->sievesizeMin, min(block->sievesizeMax, minerSettings.nSieveSize));
 	uint32 nPrimesToSieve = max(block->primesToSieveMin, min(block->primesToSieveMax, minerSettings.nPrimesToSieve));
 	pSieve_prepare(block->nBits, block->nBits, &mpzHashMultiplier, nSieveSize, nPrimesToSieve);
-
 	// Determine the sequence number of the round primorial
 	unsigned int nPrimorialSeq = 0;
 	while (vPrimes[nPrimorialSeq + 1] <= nPrimorialMultiplier)
@@ -376,32 +375,18 @@ bool MineProbablePrimeChain(primecoinBlock_t* block, mpz_class& mpzFixedMultipli
 	unsigned int& nChainLengthCunningham2 = testParams.nChainLengthCunningham2;
 	unsigned int& nChainLengthBiTwin = testParams.nChainLengthBiTwin;
 
-	//nStart = GetTickCount();
-	//nCurrent = nStart;
-
-	//uint32 timeStop = GetTickCount() + 25000;
-	//int nTries = 0;
-	//bool multipleShare = false;
-
-
-
-
-	
-
 	uint32 sieveFlags;
 	uint32 numMultipliers = 0;
 	uint32 goodChains = 0;
-	primeStats.numAllTestedNumbers += (minerSettings.nSieveSize);
+	primeStats.numAllTestedNumbers += (thread_pSieve->nSieveSize);
 	uint32 prevMultiplier;
 	while ( (block->xptFlags&XPT_WORKBUNDLE_FLAG_INTERRUPTABLE) || block->blockHeight == jhMiner_getCurrentWorkBlockHeight(block->threadIndex) )
 	{
 		prevMultiplier = nTriedMultiplier;
 		nTriedMultiplier = pSieve_nextMultiplier(&sieveFlags);
-		//nTries++;
 		nTests++;
 		if (nTriedMultiplier == 0 )
 		{
-			//printf("numMultipliers: %4d goodChains: %4d\n", numMultipliers, goodChains);
 			return false;
 		}
 		mpzChainOrigin = mpzHashMultiplier * nTriedMultiplier;
