@@ -996,7 +996,7 @@ int single_modinv (int a, int modulus)
 unsigned int int_invert(unsigned int a, unsigned int nPrime)
 {
     // Extended Euclidean algorithm to calculate the inverse of a in finite field defined by nPrime
-    int rem0 = nPrime, rem1 = a % nPrime, rem2;
+	int rem0 = nPrime, rem1 = a % nPrime, rem2;
     int aux0 = 0, aux1 = 1, aux2;
     int quotient, inverse;
 

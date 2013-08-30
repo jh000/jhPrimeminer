@@ -136,7 +136,7 @@ jsonObject_t* jsonClient_request(jsonRequestTarget_t* server, char* methodName, 
 		fStr_append(fStr_jsonRequestData, "[]"); // no parameter -> empty array
 	fStr_append(fStr_jsonRequestData, ", \"id\":0}");
 	// prepare header
-	fStr_buffer1kb_t fStrBuffer_header;
+	fStr_buffer4kb_t fStrBuffer_header;
 	fStr_t* fStr_headerData = fStr_alloc(&fStrBuffer_header, FSTR_FORMAT_UTF8);
 	// header fields
 	fStr_appendFormatted(fStr_headerData, "POST / HTTP/1.1\r\n");

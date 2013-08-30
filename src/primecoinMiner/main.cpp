@@ -27,55 +27,22 @@ commandlineInput_t commandlineInput = {0};
 primeStats_t primeStats = {0};
 volatile int total_shares = 0;
 volatile int valid_shares = 0;
-//unsigned int nMaxSieveSize;
-//unsigned int nSievePercentage;
 char* dt;
 
 minerSettings_t minerSettings = {0};
 
 #define DEFAULT_SIEVE_SIZE			(1024*2000)
-#define DEFAULT_PRIMES_TO_SIEVE		(35000)
+#define DEFAULT_PRIMES_TO_SIEVE		(32000)
 
-char* minerVersionString = "jhPrimeminer v0.5 r2 (official)"; // this is the version string displayed on the worker live stats page (max 45 characters)
+char* minerVersionString = "jhPrimeminer v0.5 r3 (official)"; // this is the version string displayed on the worker live stats page (max 45 characters)
 
 bool error(const char *format, ...)
 {
 	puts(format);
-	//__debugbreak();
 	return false;
 }
 
-/*
-bool hex2bin(unsigned char *p, const char *hexstr, size_t len)
-{
-	while (*hexstr && len) {
-		char hex_byte[3];
-		unsigned int v;
-
-		if (!hexstr[1]) {
-			printf("hex2bin str truncated");
-			return false;
-		}
-
-		hex_byte[0] = hexstr[0];
-		hex_byte[1] = hexstr[1];
-		hex_byte[2] = 0;
-
-		if (sscanf(hex_byte, "%x", &v) != 1) {
-			printf("hex2bin sscanf '%s' failed", hex_byte);
-			return false;
-		}
-
-		*p = (unsigned char) v;
-
-		p++;
-		hexstr += 2;
-		len--;
-	}
-
-	return (len == 0 && *hexstr == 0) ? true : false;
-}
-*/
+// Important: Once you are done with the fStr method
 
 bool hex2bin(unsigned char *p, const char *hexstr, size_t len)
 {

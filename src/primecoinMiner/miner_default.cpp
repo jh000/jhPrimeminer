@@ -35,6 +35,8 @@ void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, 
 		thread_pSieve = NULL;
 	}
 	// allocate and init sieve
+	uint32 primeSieveCluster = 1200; // sieve up to this prime in cluster of chain length (faster but requires additional padding data at the end of the sieve data)
+	uint32 primeSieveClusterExtraBoundary = (vPrimes[primeSieveCluster]+7)/8;
 	if( thread_pSieve == NULL )
 	{
 		thread_pSieve = (pSieve_t*)malloc(sizeof(pSieve_t));
@@ -42,9 +44,10 @@ void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, 
 		pSieve = thread_pSieve;
 		pSieve->nSieveSize = nSieveSize;
 		pSieve->nPrimesToSieve = nPrimesToSieve;
-		pSieve->vfCandidatesC1 = (uint8*)malloc(pSieve->nSieveSize/8 + 1256*2);
-		pSieve->vfCandidatesC2 = (uint8*)malloc(pSieve->nSieveSize/8 + 1256*2);
-		pSieve->vfCandidatesBt = (uint8*)malloc(pSieve->nSieveSize/8 + 1256*2);
+		
+		pSieve->vfCandidatesC1 = (uint8*)malloc(pSieve->nSieveSize/8 + primeSieveClusterExtraBoundary*2);
+		pSieve->vfCandidatesC2 = (uint8*)malloc(pSieve->nSieveSize/8 + primeSieveClusterExtraBoundary*2);
+		pSieve->vfCandidatesBt = (uint8*)malloc(pSieve->nSieveSize/8 + primeSieveClusterExtraBoundary*2);
 	}
 	else
 		pSieve = thread_pSieve;
@@ -78,9 +81,9 @@ void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, 
 	uint8* vfCompositeCunningham2 = pSieve->vfCandidatesC2;
 	uint8* vfCompositeBiTwin = pSieve->vfCandidatesBt;
 
-	uint64 bufferedSieveSize = nSieveSize + 1256*8;
+	uint64 bufferedSieveSize = nSieveSize + primeSieveClusterExtraBoundary*8;
 	// small primes, cached access
-	for(uint32 nPrimeSeq=0; nPrimeSeq<1200; nPrimeSeq++) // 1200 is a good value
+	for(uint32 nPrimeSeq=0; nPrimeSeq<primeSieveCluster; nPrimeSeq++) // 1200 is a good value
 	{
 		// seems to be buggy :(
 		register unsigned int nPrime = vPrimes[nPrimeSeq];
@@ -213,7 +216,7 @@ void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, 
 		}
 	}
 	// continue with larger primes where the distance does not fall into the same cache line
-	for(uint32 nPrimeSeq=1200; nPrimeSeq<pSieve->nPrimesToSieve; nPrimeSeq++)
+	for(uint32 nPrimeSeq=primeSieveCluster; nPrimeSeq<pSieve->nPrimesToSieve; nPrimeSeq++)
 	{
 		register unsigned int nPrime = vPrimes[nPrimeSeq];
 		nFixedFactorMod = mpz_tdiv_ui(mpzFixedFactor, nPrime);
@@ -237,7 +240,7 @@ void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, 
 			uint64 nSolvedMultiplier = solvedMultiplierC1[nBiTwinSeq];
 			for (register uint64 nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
 			{
-				_mm_prefetch((const CHAR *)&vfCompositeCunningham1[nVariableMultiplier>>3], _MM_HINT_NTA);
+				//_mm_prefetch((const CHAR *)&vfCompositeCunningham1[nVariableMultiplier>>3], _MM_HINT_NTA);
 				vfCompositeCunningham1[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
 			}
 		}
@@ -246,7 +249,7 @@ void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, 
 			uint64 nSolvedMultiplier = solvedMultiplierC2[nBiTwinSeq];
 			for (register uint64 nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
 			{
-				_mm_prefetch((const CHAR *)&vfCompositeCunningham2[nVariableMultiplier>>3], _MM_HINT_NTA);
+				//_mm_prefetch((const CHAR *)&vfCompositeCunningham2[nVariableMultiplier>>3], _MM_HINT_NTA);
 				vfCompositeCunningham2[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
 			}
 		}
@@ -259,7 +262,7 @@ void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, 
 				nSolvedMultiplier = solvedMultiplierC1[nBiTwinSeq>>1];
 			for (register uint64 nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
 			{
-				_mm_prefetch((const CHAR *)&vfCompositeBiTwin[nVariableMultiplier>>3], _MM_HINT_NTA);
+				//_mm_prefetch((const CHAR *)&vfCompositeBiTwin[nVariableMultiplier>>3], _MM_HINT_NTA);
 				vfCompositeBiTwin[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
 			}
 		}
