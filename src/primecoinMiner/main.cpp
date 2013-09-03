@@ -31,10 +31,11 @@ char* dt;
 
 minerSettings_t minerSettings = {0};
 
+// default good settings:
 #define DEFAULT_SIEVE_SIZE			(1024*2000)
-#define DEFAULT_PRIMES_TO_SIEVE		(32000)
+#define DEFAULT_PRIMES_TO_SIEVE		(28000)
 
-char* minerVersionString = "jhPrimeminer v0.5 r3 (official)"; // this is the version string displayed on the worker live stats page (max 45 characters)
+char* minerVersionString = "jhPrimeminer v0.5 r5 (official)"; // this is the version string displayed on the worker live stats page (max 45 characters)
 
 bool error(const char *format, ...)
 {
@@ -244,7 +245,7 @@ void jhMiner_primecoinBeginProofOfWork(uint8 merkleRoot[32], uint8 prevBlockHash
  */
 void jhMiner_primecoinAddProofOfWork(uint8 merkleRoot[32], uint8 prevBlockHash[32], uint32 numberOfProcessedSieves, uint32 timestamp, uint32 proofChainLength, uint8 proofChainType, uint32 proofNonce, uint32 proofMultiplier, uint32 proofDepth)
 {
-	//printf("Feeding proof of work hash, timestamp: %08X sieves: %d\n", timestamp, numberOfProcessedSieves);
+	// printf("Feeding proof of work hash, timestamp: %08X sieves: %d proof: %08x mp: %d\n", timestamp, numberOfProcessedSieves, proofChainLength, proofMultiplier);
 	EnterCriticalSection(&workData.cs);
 	for(uint32 i=0; i<workData.proofOfWork.size(); i++)
 	{
@@ -1090,7 +1091,7 @@ int main(int argc, char **argv)
 		exit(-1);
 	}
 	printf("\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\n");
-	printf("\xBA  jhPrimeminer (v0.5 beta)                                     \xBA\n");
+	printf("\xBA  jhPrimeminer (v0.5 beta r4)                                  \xBA\n");
 	printf("\xBA  contributors: hg5fm, x3maniac, jh                            \xBA\n");
 	printf("\xBA  credits: Sunny King for the original Primecoin client&miner  \xBA\n");
 	printf("\xBA  credits: mikaelh for the performance optimizations           \xBA\n");

@@ -19,7 +19,7 @@ __declspec( thread ) pSieve_t* thread_pSieve = NULL;
 unsigned int int_invert(unsigned int a, unsigned int nPrime);
 extern uint32* vTwoInverses;
 
-void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, uint32 nSieveSize, uint32 nPrimesToSieve)
+void pSieve_prepare_chainLength10(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, uint32 nSieveSize, uint32 nPrimesToSieve)
 {
 	pSieve_t* pSieve;
 	// align sieve size to 64 (so we can process multipliers in 64 bit integers)
@@ -44,7 +44,7 @@ void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, 
 		pSieve = thread_pSieve;
 		pSieve->nSieveSize = nSieveSize;
 		pSieve->nPrimesToSieve = nPrimesToSieve;
-		
+
 		pSieve->vfCandidatesC1 = (uint8*)malloc(pSieve->nSieveSize/8 + primeSieveClusterExtraBoundary*2);
 		pSieve->vfCandidatesC2 = (uint8*)malloc(pSieve->nSieveSize/8 + primeSieveClusterExtraBoundary*2);
 		pSieve->vfCandidatesBt = (uint8*)malloc(pSieve->nSieveSize/8 + primeSieveClusterExtraBoundary*2);
@@ -275,6 +275,252 @@ void pSieve_prepare(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, 
 	return;
 }
 
+void pSieve_prepare_chainLength9(uint32 nBits, uint32 sieveBits, mpz_class* _mpzFixedFactor, uint32 nSieveSize, uint32 nPrimesToSieve)
+{
+	pSieve_t* pSieve;
+	// align sieve size to 64 (so we can process multipliers in 64 bit integers)
+	nSieveSize = (nSieveSize+63)&~63;
+	// do we need to free the sieve?
+	if( thread_pSieve && (thread_pSieve->nSieveSize != nSieveSize) )
+	{
+		// free sieve - parameters changed
+		free(thread_pSieve->vfCandidatesC1);
+		free(thread_pSieve->vfCandidatesC2);
+		free(thread_pSieve->vfCandidatesBt);
+		free(thread_pSieve);
+		thread_pSieve = NULL;
+	}
+	// allocate and init sieve
+	uint32 primeSieveCluster = 1200; // sieve up to this prime in cluster of chain length (faster but requires additional padding data at the end of the sieve data)
+	uint32 primeSieveClusterExtraBoundary = (vPrimes[primeSieveCluster]+7)/8;
+	if( thread_pSieve == NULL )
+	{
+		thread_pSieve = (pSieve_t*)malloc(sizeof(pSieve_t));
+		memset(thread_pSieve, 0x00, sizeof(pSieve_t));
+		pSieve = thread_pSieve;
+		pSieve->nSieveSize = nSieveSize;
+		pSieve->nPrimesToSieve = nPrimesToSieve;
+
+		pSieve->vfCandidatesC1 = (uint8*)malloc(pSieve->nSieveSize/8 + primeSieveClusterExtraBoundary*2);
+		pSieve->vfCandidatesC2 = (uint8*)malloc(pSieve->nSieveSize/8 + primeSieveClusterExtraBoundary*2);
+		pSieve->vfCandidatesBt = (uint8*)malloc(pSieve->nSieveSize/8 + primeSieveClusterExtraBoundary*2);
+	}
+	else
+		pSieve = thread_pSieve;
+
+	// make sure primesToSieve is correct (doesn't need full sieve reset)
+	pSieve->nPrimesToSieve = nPrimesToSieve;
+
+	memset(pSieve->vfCandidatesC1, 0x00, pSieve->nSieveSize/8);
+	memset(pSieve->vfCandidatesC2, 0x00, pSieve->nSieveSize/8);
+	memset(pSieve->vfCandidatesBt, 0x00, pSieve->nSieveSize/8);
+
+	const unsigned int nChainLength = TargetGetLength(nBits);
+	unsigned int nPrimeSeq = 0;
+	//unsigned int vPrimesSize2 = vPrimesSize;
+
+	// Process only 10% of the primes
+	// Most composites are still found
+	//vPrimesSize2 = (uint64)vPrimesSize2 * 8 / 100;
+
+	pSieve->triedMultiplier = 1;
+
+	mpz_t mpzFixedFactor;
+
+
+	unsigned long nFixedFactorMod;
+	unsigned long nFixedInverse;
+	unsigned long nTwoInverse;
+	uint32 nTime = GetTickCount();
+	mpz_init_set(mpzFixedFactor, _mpzFixedFactor->get_mpz_t());
+	uint8* vfCompositeCunningham1 = pSieve->vfCandidatesC1;
+	uint8* vfCompositeCunningham2 = pSieve->vfCandidatesC2;
+	uint8* vfCompositeBiTwin = pSieve->vfCandidatesBt;
+
+	uint64 bufferedSieveSize = nSieveSize + primeSieveClusterExtraBoundary*8;
+	// small primes, cached access
+	for(uint32 nPrimeSeq=0; nPrimeSeq<primeSieveCluster; nPrimeSeq++) // 1200 is a good value
+	{
+		// seems to be buggy :(
+		register unsigned int nPrime = vPrimes[nPrimeSeq];
+		nFixedFactorMod = mpz_tdiv_ui(mpzFixedFactor, nPrime);
+		if (nFixedFactorMod == 0)
+		{
+			// Nothing in the sieve is divisible by this prime
+			continue;
+		}
+		uint32 pU64 = (uint32)vPrimes[nPrimeSeq];
+		uint32 fixedInverseU64 = int_invert(nFixedFactorMod, nPrime);//mpz_get_ui(mpzFixedInverse);
+		uint32 twoInverseU64 = vTwoInverses[nPrimeSeq];
+		// Weave the sieve for the prime
+		uint32 nMultiplierC1[9];
+		uint32 nMultiplierC2[9];
+		uint32 nMultiplierBt[10];
+		for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 9 * 2; nBiTwinSeq++)
+		{
+			if( (nBiTwinSeq&1) == 0 )
+			{
+				uint32 nSolvedMultiplier = fixedInverseU64;
+				nMultiplierC1[nBiTwinSeq>>1] = nSolvedMultiplier;
+				if( nBiTwinSeq < 10 )
+					nMultiplierBt[nBiTwinSeq] = nSolvedMultiplier;
+			}
+			else
+			{
+				uint32 nSolvedMultiplier = (pU64-fixedInverseU64);//((fixedInverseU64) * (pU64 - 1ULL)) % pU64;
+				nMultiplierC2[nBiTwinSeq>>1] = nSolvedMultiplier;
+				if( nBiTwinSeq < 10 )
+					nMultiplierBt[nBiTwinSeq] = nSolvedMultiplier;
+				fixedInverseU64 = (uint32)(((uint64)fixedInverseU64*(uint64)twoInverseU64)%(uint64)pU64);
+			}
+		}
+
+		register uint64 nSolvedMultiplier0 = nMultiplierC1[0];
+		register uint64 nSolvedMultiplier1 = nMultiplierC1[1];
+		register uint64 nSolvedMultiplier2 = nMultiplierC1[2];
+		register uint64 nSolvedMultiplier3 = nMultiplierC1[3];
+		register uint64 nSolvedMultiplier4 = nMultiplierC1[4];
+		register uint64 nSolvedMultiplier5 = nMultiplierC1[5];
+		register uint64 nSolvedMultiplier6 = nMultiplierC1[6];
+		register uint64 nSolvedMultiplier7 = nMultiplierC1[7];
+		register uint64 nSolvedMultiplier8 = nMultiplierC1[8];
+		for (;nSolvedMultiplier0<bufferedSieveSize;)
+		{
+			vfCompositeCunningham1[nSolvedMultiplier0>>3] |= 1<<(nSolvedMultiplier0&7);
+			nSolvedMultiplier0 += nPrime;
+			vfCompositeCunningham1[nSolvedMultiplier1>>3] |= 1<<(nSolvedMultiplier1&7);
+			nSolvedMultiplier1 += nPrime;
+			vfCompositeCunningham1[nSolvedMultiplier2>>3] |= 1<<(nSolvedMultiplier2&7);
+			nSolvedMultiplier2 += nPrime;
+			vfCompositeCunningham1[nSolvedMultiplier3>>3] |= 1<<(nSolvedMultiplier3&7);
+			nSolvedMultiplier3 += nPrime;
+			vfCompositeCunningham1[nSolvedMultiplier4>>3] |= 1<<(nSolvedMultiplier4&7);
+			nSolvedMultiplier4 += nPrime;
+			vfCompositeCunningham1[nSolvedMultiplier5>>3] |= 1<<(nSolvedMultiplier5&7);
+			nSolvedMultiplier5 += nPrime;
+			vfCompositeCunningham1[nSolvedMultiplier6>>3] |= 1<<(nSolvedMultiplier6&7);
+			nSolvedMultiplier6 += nPrime;
+			vfCompositeCunningham1[nSolvedMultiplier7>>3] |= 1<<(nSolvedMultiplier7&7);
+			nSolvedMultiplier7 += nPrime;
+			vfCompositeCunningham1[nSolvedMultiplier8>>3] |= 1<<(nSolvedMultiplier8&7);
+			nSolvedMultiplier8 += nPrime;
+		}
+		nSolvedMultiplier0 = nMultiplierC2[0];
+		nSolvedMultiplier1 = nMultiplierC2[1];
+		nSolvedMultiplier2 = nMultiplierC2[2];
+		nSolvedMultiplier3 = nMultiplierC2[3];
+		nSolvedMultiplier4 = nMultiplierC2[4];
+		nSolvedMultiplier5 = nMultiplierC2[5];
+		nSolvedMultiplier6 = nMultiplierC2[6];
+		nSolvedMultiplier7 = nMultiplierC2[7];
+		nSolvedMultiplier8 = nMultiplierC2[8];
+		for (;nSolvedMultiplier0<bufferedSieveSize;)
+		{
+			vfCompositeCunningham2[nSolvedMultiplier0>>3] |= 1<<(nSolvedMultiplier0&7);
+			nSolvedMultiplier0 += nPrime;
+			vfCompositeCunningham2[nSolvedMultiplier1>>3] |= 1<<(nSolvedMultiplier1&7);
+			nSolvedMultiplier1 += nPrime;
+			vfCompositeCunningham2[nSolvedMultiplier2>>3] |= 1<<(nSolvedMultiplier2&7);
+			nSolvedMultiplier2 += nPrime;
+			vfCompositeCunningham2[nSolvedMultiplier3>>3] |= 1<<(nSolvedMultiplier3&7);
+			nSolvedMultiplier3 += nPrime;
+			vfCompositeCunningham2[nSolvedMultiplier4>>3] |= 1<<(nSolvedMultiplier4&7);
+			nSolvedMultiplier4 += nPrime;
+			vfCompositeCunningham2[nSolvedMultiplier5>>3] |= 1<<(nSolvedMultiplier5&7);
+			nSolvedMultiplier5 += nPrime;
+			vfCompositeCunningham2[nSolvedMultiplier6>>3] |= 1<<(nSolvedMultiplier6&7);
+			nSolvedMultiplier6 += nPrime;
+			vfCompositeCunningham2[nSolvedMultiplier7>>3] |= 1<<(nSolvedMultiplier7&7);
+			nSolvedMultiplier7 += nPrime;
+		}
+		nSolvedMultiplier0 = nMultiplierBt[0];
+		nSolvedMultiplier1 = nMultiplierBt[1];
+		nSolvedMultiplier2 = nMultiplierBt[2];
+		nSolvedMultiplier3 = nMultiplierBt[3];
+		nSolvedMultiplier4 = nMultiplierBt[4];
+		nSolvedMultiplier5 = nMultiplierBt[5];
+		nSolvedMultiplier6 = nMultiplierBt[6];
+		nSolvedMultiplier7 = nMultiplierBt[7];
+		nSolvedMultiplier8 = nMultiplierBt[8];
+		register uint64 nSolvedMultiplier9 = nMultiplierBt[9];
+		for (;nSolvedMultiplier0<bufferedSieveSize;)
+		{
+			vfCompositeBiTwin[nSolvedMultiplier0>>3] |= 1<<(nSolvedMultiplier0&7);
+			nSolvedMultiplier0 += nPrime;
+			vfCompositeBiTwin[nSolvedMultiplier1>>3] |= 1<<(nSolvedMultiplier1&7);
+			nSolvedMultiplier1 += nPrime;
+			vfCompositeBiTwin[nSolvedMultiplier2>>3] |= 1<<(nSolvedMultiplier2&7);
+			nSolvedMultiplier2 += nPrime;
+			vfCompositeBiTwin[nSolvedMultiplier3>>3] |= 1<<(nSolvedMultiplier3&7);
+			nSolvedMultiplier3 += nPrime;
+			vfCompositeBiTwin[nSolvedMultiplier4>>3] |= 1<<(nSolvedMultiplier4&7);
+			nSolvedMultiplier4 += nPrime;
+			vfCompositeBiTwin[nSolvedMultiplier5>>3] |= 1<<(nSolvedMultiplier5&7);
+			nSolvedMultiplier5 += nPrime;
+			vfCompositeBiTwin[nSolvedMultiplier6>>3] |= 1<<(nSolvedMultiplier6&7);
+			nSolvedMultiplier6 += nPrime;
+			vfCompositeBiTwin[nSolvedMultiplier7>>3] |= 1<<(nSolvedMultiplier7&7);
+			nSolvedMultiplier7 += nPrime;
+			vfCompositeBiTwin[nSolvedMultiplier9>>3] |= 1<<(nSolvedMultiplier9&7);
+			nSolvedMultiplier9 += nPrime;
+		}
+	}
+	// continue with larger primes where the distance does not fall into the same cache line
+	for(uint32 nPrimeSeq=primeSieveCluster; nPrimeSeq<pSieve->nPrimesToSieve; nPrimeSeq++)
+	{
+		register unsigned int nPrime = vPrimes[nPrimeSeq];
+		nFixedFactorMod = mpz_tdiv_ui(mpzFixedFactor, nPrime);
+		if (nFixedFactorMod == 0)
+			continue;
+		// Find the modulo inverse of fixed factor
+		uint32 fixedInverse = int_invert(nFixedFactorMod, nPrime);
+		uint32 twoInverseU64 = vTwoInverses[nPrimeSeq];
+		// Weave the sieve for the prime
+		uint32 solvedMultiplierC1[9];
+		uint32 solvedMultiplierC2[9];
+		for (unsigned int nBiTwinSeq = 0; nBiTwinSeq < 9; nBiTwinSeq++)
+		{
+			solvedMultiplierC1[nBiTwinSeq] = fixedInverse;
+			solvedMultiplierC2[nBiTwinSeq] = (nPrime-fixedInverse);
+			fixedInverse = (uint32)(((uint64)fixedInverse*(uint64)twoInverseU64)%(uint64)nPrime);
+		}
+		for(uint32 nBiTwinSeq=0; nBiTwinSeq<9; nBiTwinSeq++)
+		{
+			uint64 nSolvedMultiplier = solvedMultiplierC1[nBiTwinSeq];
+			for (register uint64 nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
+			{
+				vfCompositeCunningham1[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
+			}
+		}
+		for(uint32 nBiTwinSeq=0; nBiTwinSeq<9; nBiTwinSeq++)
+		{
+			uint64 nSolvedMultiplier = solvedMultiplierC2[nBiTwinSeq];
+			for (register uint64 nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
+			{
+				vfCompositeCunningham2[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
+			}
+		}
+		for(uint32 nBiTwinSeq=0; nBiTwinSeq<10; nBiTwinSeq++)
+		{
+			uint64 nSolvedMultiplier;
+			if( nBiTwinSeq & 1 )
+				nSolvedMultiplier = solvedMultiplierC2[nBiTwinSeq>>1];
+			else
+				nSolvedMultiplier = solvedMultiplierC1[nBiTwinSeq>>1];
+			for (register uint64 nVariableMultiplier = nSolvedMultiplier; nVariableMultiplier < nSieveSize; nVariableMultiplier += nPrime)
+			{
+				vfCompositeBiTwin[nVariableMultiplier>>3] |= 1<<(nVariableMultiplier&7);
+			}
+		}
+	}
+	mpz_clear(mpzFixedFactor);
+
+	nTime = GetTickCount() - nTime;
+	//printf("Sieve time: %dms\n", nTime);
+
+	return;
+}
+
 uint32 pSieve_nextMultiplier(uint32* sieveFlags)
 {
 	*sieveFlags = 0;
@@ -336,7 +582,12 @@ bool MineProbablePrimeChain(primecoinBlock_t* block, mpz_class& mpzFixedMultipli
 
 	uint32 nSieveSize = max(block->sievesizeMin, min(block->sievesizeMax, minerSettings.nSieveSize));
 	uint32 nPrimesToSieve = max(block->primesToSieveMin, min(block->primesToSieveMax, minerSettings.nPrimesToSieve));
-	pSieve_prepare(block->nBits, block->nBits, &mpzHashMultiplier, nSieveSize, nPrimesToSieve);
+
+	if( block->sieveChainLength == 9 )
+		pSieve_prepare_chainLength9(block->nBits, block->nBits, &mpzHashMultiplier, nSieveSize, nPrimesToSieve);
+	else if( block->sieveChainLength >= 10 )
+		pSieve_prepare_chainLength10(block->nBits, block->nBits, &mpzHashMultiplier, nSieveSize, nPrimesToSieve);
+	// todo: General sieve for length 11 and above
 	// Determine the sequence number of the round primorial
 	unsigned int nPrimorialSeq = 0;
 	while (vPrimes[nPrimorialSeq + 1] <= nPrimorialMultiplier)
